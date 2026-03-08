@@ -189,12 +189,14 @@ Controls:
 The gameplay code was split into focused modules so it is easier to read and extend:
 
 - `main.py`: thin entrypoint that starts the game.
-- `bomb_bugs/game.py`: main game loop and high-level flow.
+- `bomb_bugs/game.py`: orchestration loop (wires modules together).
+- `bomb_bugs/gameplay.py`: gameplay systems (input, combat, movement, bombs, respawn, floating text events).
+- `bomb_bugs/rendering.py`: frame rendering pipeline.
 - `bomb_bugs/config.py`: constants and tuning values (movement, combat, timing).
 - `bomb_bugs/models.py`: shared data models (`Actor`, particles, state objects).
 - `bomb_bugs/world.py`: platform creation and landing/collision helpers.
 - `bomb_bugs/combat.py`: slash hitbox construction.
 - `bomb_bugs/effects.py`: slash visuals, dust death effect, reverse-dust respawn effect, dash trail.
-- `bomb_bugs/ui.py`: health bars and debug HUD text.
+- `bomb_bugs/ui.py`: health bars, debug HUD text, pixel-font floating number rendering.
 
 If you want to tune game feel quickly, start with `bomb_bugs/config.py`.

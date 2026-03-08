@@ -12,6 +12,7 @@ from .config import (
     HEIGHT,
     MOON_MAX_RADIUS,
     MOON_MIN_RADIUS,
+    MUSHROOM_CLOUD_LIFETIME,
     RESPAWN_ANIM_TIME,
     HEAL_SPLASH_TIME,
     SLASH_ACTIVE_TIME,
@@ -19,7 +20,7 @@ from .config import (
     TRAIL_LIFETIME,
     WIDTH,
 )
-from .models import DustParticle, HealSplash, RespawnParticle
+from .models import DustParticle, HealSplash, MushroomCloud, RespawnParticle
 
 
 def make_dust_particles(rect: pygame.Rect) -> list[DustParticle]:
@@ -193,3 +194,83 @@ def draw_heal_splashes(surface: pygame.Surface, splashes: list[HealSplash]) -> N
                 size,
             )
         surface.blit(splash_surface, (0, 0))
+
+
+def make_mushroom_cloud(x: float, y: float) -> MushroomCloud:
+    return MushroomCloud(x=x, y=y, life=MUSHROOM_CLOUD_LIFETIME, max_life=MUSHROOM_CLOUD_LIFETIME)
+
+
+def update_mushroom_clouds(clouds: list[MushroomCloud], dt: float) -> list[MushroomCloud]:
+    for cloud in clouds:
+        cloud.life -= dt
+    return [cloud for cloud in clouds if cloud.life > 0.0]
+
+
+def draw_mushroom_clouds(surface: pygame.Surface, clouds: list[MushroomCloud]) -> None:
+    for cloud in clouds:
+        progress = 1.0 - (cloud.life / cloud.max_life)
+        progress = max(0.0, min(1.0, progress))
+
+        # End-of-life "blip away" behavior: rapid flicker, then hard vanish.
+        if progress > 0.82:
+            flicker = int(cloud.life * 95)
+            if flicker % 3 == 0:
+                continue
+            if progress > 0.94 and flicker % 2 == 0:
+                continue
+
+        # Rising stem.
+        stem_height = int(8 + 72 * progress)
+        stem_width = int(6 + 12 * progress)
+        stem_alpha = int(220 * (1.0 - progress * 0.55))
+        stem_rect = pygame.Rect(
+            int(cloud.x - stem_width / 2),
+            int(cloud.y - stem_height),
+            stem_width,
+            stem_height,
+        )
+        cloud_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        pygame.draw.ellipse(cloud_surface, (120, 96, 78, stem_alpha), stem_rect)
+
+        # Top cap expands like a mushroom dome.
+        cap_radius = int(14 + 44 * progress)
+        cap_center = (int(cloud.x), int(cloud.y - stem_height))
+        cap_alpha = int(235 * (1.0 - progress * 0.5))
+        pygame.draw.circle(cloud_surface, (168, 136, 108, cap_alpha), cap_center, cap_radius)
+        pygame.draw.circle(
+            cloud_surface,
+            (208, 182, 148, int(cap_alpha * 0.65)),
+            (cap_center[0] + int(cap_radius * 0.15), cap_center[1] - int(cap_radius * 0.12)),
+            int(cap_radius * 0.62),
+        )
+
+        # Ground shock ring / dust.
+        ring_radius = int(8 + 68 * progress)
+        ring_alpha = int(160 * (1.0 - progress))
+        pygame.draw.circle(
+            cloud_surface,
+            (180, 146, 116, ring_alpha),
+            (int(cloud.x), int(cloud.y)),
+            ring_radius,
+            max(2, int(8 * (1.0 - progress))),
+        )
+
+        # Pixelate by scaling the local effect area down and back up.
+        bounds_radius = ring_radius + 24
+        effect_rect = pygame.Rect(
+            int(cloud.x - bounds_radius),
+            int(cloud.y - stem_height - bounds_radius),
+            int(bounds_radius * 2),
+            int(bounds_radius * 2 + stem_height),
+        )
+        effect_rect = effect_rect.clip(pygame.Rect(0, 0, WIDTH, HEIGHT))
+        if effect_rect.width <= 0 or effect_rect.height <= 0:
+            continue
+
+        patch = cloud_surface.subsurface(effect_rect).copy()
+        pixel_step = 5
+        small_w = max(1, effect_rect.width // pixel_step)
+        small_h = max(1, effect_rect.height // pixel_step)
+        patch_small = pygame.transform.scale(patch, (small_w, small_h))
+        patch_pixel = pygame.transform.scale(patch_small, (effect_rect.width, effect_rect.height))
+        surface.blit(patch_pixel, effect_rect.topleft)

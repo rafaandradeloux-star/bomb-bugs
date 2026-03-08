@@ -63,6 +63,14 @@ class FloatingText:
 
 
 @dataclass
+class MushroomCloud:
+    x: float
+    y: float
+    life: float
+    max_life: float
+
+
+@dataclass
 class Actor:
     rect: pygame.Rect
     color: tuple[int, int, int]
@@ -93,6 +101,9 @@ class PlayerState:
     heal_splashes: list[HealSplash] = field(default_factory=list)
     bombs: list[Bomb] = field(default_factory=list)
     floating_texts: list[FloatingText] = field(default_factory=list)
+    mushroom_clouds: list[MushroomCloud] = field(default_factory=list)
+    shake_time_left: float = 0.0
+    shake_phase: float = 0.0
 
 
 @dataclass
