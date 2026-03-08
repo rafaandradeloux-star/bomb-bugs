@@ -16,28 +16,28 @@ Create a playable prototype where:
 
 This phase validates controls, performance baseline, and development pipeline before investing in full character systems.
 
-## Recommended Technology (Web First)
+## Recommended Technology (Web First, Python)
 
-For a web-first launch with strong 2D performance and fast iteration:
+For a web-first launch with Python and fast iteration:
 
-- Engine: Phaser 3
-- Language: TypeScript
-- Build tool: Vite
+- Engine/Framework: pygame-ce
+- Language: Python 3.11+
+- Web packaging: pygbag (WebAssembly build for browser)
 - Input: Keyboard first, optional gamepad/touch later
 - Source control: Git + GitHub
 - Art pipeline: Placeholder sprites first, final art later
-- Audio: Web Audio API (via Phaser)
+- Audio: pygame mixer
 
-Why Phaser + TypeScript:
+Why pygame-ce + pygbag:
 
-- Built for browser games
-- Lightweight and quick to ship
-- Great for 2D combat gameplay
-- Easier web deployment and testing
+- Pure Python development workflow
+- Fast for 2D prototyping and combat loops
+- Can ship to browser using WebAssembly
+- Simple local iteration before web builds
 
 Alternative:
 
-- Godot Web export is viable, but Phaser is simpler for a pure 2D browser-first release.
+- Godot Web export is viable, but pygame-ce + pygbag keeps the stack fully Python.
 
 ## Core Game Requirements (Target State)
 
@@ -73,7 +73,8 @@ Alternative:
 
 ### Phase 1: Movement Prototype (1 week)
 
-- Phaser + TypeScript project setup
+- pygame-ce project setup
+- pygbag web build setup
 - Simple scene + cube placeholder
 - Left/right movement with keyboard input
 - Basic camera and boundaries
@@ -163,4 +164,17 @@ Both collaborate on architecture, code reviews, and balancing.
 
 ## Next Step (Immediate)
 
-Implement Phase 1 this week: create the Phaser project, add cube movement, and ship a first playable browser build.
+Implement Phase 1 this week: create the pygame-ce project, configure pygbag, add cube movement, and ship a first playable browser build.
+
+## Run Locally (Current Prototype)
+
+1. Activate the virtual environment:
+   `source .venv/bin/activate`
+2. Run the game:
+   `python main.py`
+
+Controls:
+
+- Move left: `Left Arrow` or `A`
+- Move right: `Right Arrow` or `D`
+- Quit: close the game window
