@@ -21,11 +21,16 @@ from .config import (
     ENEMY_CHASE_SPEED,
     ENEMY_JUMP_COOLDOWN,
     ENEMY_JUMP_VELOCITY,
+    ENEMY_PATH_MAX_POINTS,
+    ENEMY_PATH_SAMPLE_INTERVAL,
     ENEMY_SLASH_COOLDOWN,
     ENEMY_SPEED,
     FLOATING_TEXT_LIFETIME,
     FLOATING_TEXT_RISE_SPEED,
     GRAVITY,
+    GROUND_POUND_COOLDOWN,
+    GROUND_POUND_DAMAGE,
+    GROUND_POUND_FALL_SPEED,
     HEAL_AMOUNT,
     HEAL_COOLDOWN,
     HEIGHT,
@@ -42,14 +47,20 @@ from .config import (
 )
 from .effects import (
     make_dust_particles,
+    make_ground_dent,
+    make_ground_spike,
+    make_rubble_particles,
     make_heal_splash,
     make_mushroom_cloud,
     make_respawn_particles,
     make_trail_particle,
     update_dust_particles,
+    update_ground_dents,
+    update_ground_spikes,
     update_heal_splashes,
     update_mushroom_clouds,
     update_respawn_particles,
+    update_rubble_particles,
 )
 from .models import Actor, Bomb, EnemyAI, FloatingText, PlayerState
 from .world import resolve_platform_landing
@@ -60,6 +71,7 @@ def tick_timers(player: Actor, enemy: Actor, player_state: PlayerState, dt: floa
     player_state.dash_cooldown_left = max(0.0, player_state.dash_cooldown_left - dt)
     player_state.heal_cooldown_left = max(0.0, player_state.heal_cooldown_left - dt)
     player_state.bomb_cooldown_left = max(0.0, player_state.bomb_cooldown_left - dt)
+    player_state.ground_pound_cooldown_left = max(0.0, player_state.ground_pound_cooldown_left - dt)
     player_state.shake_time_left = max(0.0, player_state.shake_time_left - dt)
     if player_state.shake_time_left > 0.0:
         player_state.shake_phase += dt * 34.0
@@ -76,6 +88,9 @@ def update_particles(player: Actor, enemy: Actor, player_state: PlayerState, dt:
     player_state.dash_trail = update_dust_particles(player_state.dash_trail, dt)
     player_state.bomb_trail = update_dust_particles(player_state.bomb_trail, dt)
     player_state.heal_splashes = update_heal_splashes(player_state.heal_splashes, dt)
+    player_state.ground_spikes = update_ground_spikes(player_state.ground_spikes, dt)
+    player_state.ground_dents = update_ground_dents(player_state.ground_dents, dt)
+    player_state.rubble_particles = update_rubble_particles(player_state.rubble_particles, dt)
     player.death_particles = update_dust_particles(player.death_particles, dt)
     enemy.death_particles = update_dust_particles(enemy.death_particles, dt)
     player.respawn_particles = update_respawn_particles(player.respawn_particles, dt)
@@ -112,6 +127,7 @@ def handle_respawns(
             player.slash_time_left = 0.0
             player.slash_cooldown_left = 0.0
             player_state.dash_time_left = 0.0
+            player_state.ground_pound_active = False
             player_state.bombs.clear()
             player_state.bomb_trail.clear()
             player_state.floating_texts.clear()
@@ -134,6 +150,8 @@ def handle_respawns(
             enemy_ai.velocity_y = 0.0
             enemy_ai.is_grounded = True
             enemy_ai.jump_cooldown_left = 0.0
+            enemy_ai.path_sample_timer = 0.0
+            enemy_ai.path_points.clear()
 
 
 def handle_input_event(
@@ -143,6 +161,21 @@ def handle_input_event(
     player_state: PlayerState,
     platforms: list[pygame.Rect],
 ) -> None:
+    if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
+        above_enemy = player.rect.bottom <= enemy.rect.top + 10
+        if (
+            player.alive
+            and enemy.alive
+            and not player_state.is_grounded
+            and player_state.ground_pound_cooldown_left <= 0.0
+            and above_enemy
+        ):
+            player_state.ground_pound_active = True
+            player_state.ground_pound_cooldown_left = GROUND_POUND_COOLDOWN
+            player_state.dash_time_left = 0.0
+            player_state.velocity_y = max(player_state.velocity_y, GROUND_POUND_FALL_SPEED)
+        return
+
     if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
         if player.alive and player_state.is_grounded:
             player_state.velocity_y = JUMP_VELOCITY
@@ -236,14 +269,30 @@ def update_player(
     player.rect.x = max(0, min(player.rect.x, WIDTH - player.rect.width))
 
     previous_bottom = player.rect.bottom
+    if player_state.ground_pound_active:
+        player_state.velocity_y = max(player_state.velocity_y, GROUND_POUND_FALL_SPEED)
     player_state.velocity_y += GRAVITY * dt
     player.rect.y += int(player_state.velocity_y * dt)
     player_state.is_grounded = False
 
-    new_y, new_velocity, grounded = resolve_platform_landing(player.rect, previous_bottom, player_state.velocity_y, platforms)
+    landing_platforms = platforms[:1] if player_state.ground_pound_active else platforms
+    new_y, new_velocity, grounded = resolve_platform_landing(
+        player.rect,
+        previous_bottom,
+        player_state.velocity_y,
+        landing_platforms,
+    )
     player.rect.y = new_y
     player_state.velocity_y = new_velocity
     player_state.is_grounded = grounded
+    if grounded:
+        if player_state.ground_pound_active:
+            player_state.ground_spikes.append(make_ground_spike(float(player.rect.centerx), float(player.rect.bottom)))
+            player_state.ground_dents.append(make_ground_dent(float(player.rect.centerx), float(player.rect.bottom)))
+            player_state.rubble_particles.extend(
+                make_rubble_particles(float(player.rect.centerx), float(player.rect.bottom))
+            )
+        player_state.ground_pound_active = False
 
 
 def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list[pygame.Rect], dt: float) -> None:
@@ -251,19 +300,42 @@ def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list
         return
 
     if player.alive:
-        dx = player.rect.centerx - enemy.rect.centerx
-        if abs(dx) > 8:
+        enemy_ai.path_sample_timer -= dt
+        if enemy_ai.path_sample_timer <= 0.0:
+            enemy_ai.path_points.append((float(player.rect.centerx), float(player.rect.centery)))
+            enemy_ai.path_sample_timer = ENEMY_PATH_SAMPLE_INTERVAL
+            if len(enemy_ai.path_points) > ENEMY_PATH_MAX_POINTS:
+                enemy_ai.path_points.pop(0)
+
+        target_x = float(player.rect.centerx)
+        target_y = float(player.rect.centery)
+        if enemy_ai.path_points:
+            target_x, target_y = enemy_ai.path_points[0]
+            reached_x = abs(target_x - enemy.rect.centerx) <= 16
+            reached_y = abs(target_y - enemy.rect.centery) <= 42
+            if reached_x and reached_y:
+                enemy_ai.path_points.pop(0)
+                if enemy_ai.path_points:
+                    target_x, target_y = enemy_ai.path_points[0]
+                else:
+                    target_x = float(player.rect.centerx)
+                    target_y = float(player.rect.centery)
+
+        dx = target_x - enemy.rect.centerx
+        if abs(dx) > 6:
             enemy.facing_dir = 1 if dx > 0 else -1
             enemy.rect.x += int(enemy.facing_dir * ENEMY_CHASE_SPEED * dt)
 
         enemy_ai.jump_cooldown_left = max(0.0, enemy_ai.jump_cooldown_left - dt)
-        player_is_higher = player.rect.centery + 12 < enemy.rect.centery
-        close_enough = abs(dx) < 260
-        if enemy_ai.is_grounded and enemy_ai.jump_cooldown_left <= 0.0 and player_is_higher and close_enough:
+        target_is_higher = target_y + 12 < enemy.rect.centery
+        close_enough = abs(dx) < 280
+        if enemy_ai.is_grounded and enemy_ai.jump_cooldown_left <= 0.0 and target_is_higher and close_enough:
             enemy_ai.velocity_y = ENEMY_JUMP_VELOCITY
             enemy_ai.is_grounded = False
             enemy_ai.jump_cooldown_left = ENEMY_JUMP_COOLDOWN
     else:
+        enemy_ai.path_points.clear()
+        enemy_ai.path_sample_timer = 0.0
         enemy.rect.x += int(enemy_ai.patrol_dir * ENEMY_SPEED * dt)
         if enemy.rect.x < int(enemy_ai.patrol_min):
             enemy.rect.x = int(enemy_ai.patrol_min)
@@ -289,6 +361,21 @@ def resolve_combat(player: Actor, enemy: Actor, player_state: PlayerState) -> No
     if not (player.alive and enemy.alive):
         return
 
+    if player_state.ground_pound_active and player.rect.colliderect(enemy.rect):
+        old_hp = enemy.hp
+        enemy.hp = max(0, enemy.hp - GROUND_POUND_DAMAGE)
+        _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
+        player_state.shake_time_left = SCREEN_SHAKE_DURATION
+        player_state.ground_pound_active = False
+        player_state.velocity_y = -220.0
+        if enemy.hp == 0:
+            enemy.alive = False
+            enemy.respawn_timer = RESPAWN_DELAY + RESPAWN_ANIM_TIME
+            enemy.death_particles = make_dust_particles(enemy.rect)
+            enemy.respawn_particles.clear()
+            enemy.slash_time_left = 0.0
+        return
+
     dx = player.rect.centerx - enemy.rect.centerx
     in_attack_x = abs(dx) <= (SLASH_RANGE_X + 10)
     in_attack_y = abs(player.rect.centery - enemy.rect.centery) <= 70
@@ -308,6 +395,7 @@ def resolve_combat(player: Actor, enemy: Actor, player_state: PlayerState) -> No
                 player.respawn_particles.clear()
                 player.slash_time_left = 0.0
                 player_state.dash_time_left = 0.0
+                player_state.ground_pound_active = False
                 player_state.bombs.clear()
                 player_state.bomb_trail.clear()
                 player_state.floating_texts.clear()

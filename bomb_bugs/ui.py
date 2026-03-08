@@ -1,9 +1,10 @@
 import pygame
 
 from .config import (
-    DASH_COOLDOWN,
     BOMB_COOLDOWN,
+    DASH_COOLDOWN,
     FLOOR_HEIGHT,
+    GROUND_POUND_COOLDOWN,
     HEALTH_BAR_HEIGHT,
     HEALTH_BAR_WIDTH,
     HEAL_COOLDOWN,
@@ -83,6 +84,7 @@ def draw_ability_boxes(
     dash_cooldown_left: float,
     heal_cooldown_left: float,
     bomb_cooldown_left: float,
+    ground_pound_cooldown_left: float,
 ) -> None:
     box_size = 52
     padding = 12
@@ -92,18 +94,22 @@ def draw_ability_boxes(
     dash_ratio = 1.0 - max(0.0, min(1.0, dash_cooldown_left / DASH_COOLDOWN))
     heal_ratio = 1.0 - max(0.0, min(1.0, heal_cooldown_left / HEAL_COOLDOWN))
     bomb_ratio = 1.0 - max(0.0, min(1.0, bomb_cooldown_left / BOMB_COOLDOWN))
+    pound_ratio = 1.0 - max(0.0, min(1.0, ground_pound_cooldown_left / GROUND_POUND_COOLDOWN))
 
     dash_rect = pygame.Rect(base_x, base_y, box_size, box_size)
     bomb_rect = pygame.Rect(base_x + box_size + padding, base_y, box_size, box_size)
     heal_rect = pygame.Rect(base_x + (box_size + padding) * 2, base_y, box_size, box_size)
+    pound_rect = pygame.Rect(base_x + (box_size + padding) * 3, base_y, box_size, box_size)
 
     _draw_box(surface, dash_rect)
     _draw_box(surface, bomb_rect)
     _draw_box(surface, heal_rect)
+    _draw_box(surface, pound_rect)
 
     _draw_icon_with_recharge(surface, dash_rect, dash_ratio, _draw_dash_icon)
     _draw_icon_with_recharge(surface, bomb_rect, bomb_ratio, _draw_bomb_icon)
     _draw_icon_with_recharge(surface, heal_rect, heal_ratio, _draw_potion_icon)
+    _draw_icon_with_recharge(surface, pound_rect, pound_ratio, _draw_ground_pound_icon)
 
 
 def _draw_box(surface: pygame.Surface, rect: pygame.Rect) -> None:
@@ -183,21 +189,21 @@ def _draw_bomb_icon(target: pygame.Surface, colored: bool) -> None:
 
 def _draw_potion_icon(target: pygame.Surface, colored: bool) -> None:
     pattern = [
-        "...4444...",
-        "...4224...",
-        "..422224..",
-        "..421124..",
-        ".42111124.",
-        ".41111114.",
-        ".41111114.",
-        "..411114..",
+        "....33....",
+        "....33....",
+        "...3223...",
+        "...2112...",
+        "..211112..",
+        "..211112..",
+        "..211112..",
+        "...1111...",
         "...1111...",
         "....11....",
     ]
     palette = {
         "1": (60, 221, 111, 255) if colored else (108, 108, 108, 255),
         "2": (192, 238, 255, 255) if colored else (145, 145, 145, 255),
-        "4": (150, 208, 236, 255) if colored else (125, 125, 125, 255),
+        "3": (176, 125, 74, 255) if colored else (125, 125, 125, 255),
     }
     _draw_pixel_pattern(target, pattern, palette)
 
@@ -218,5 +224,27 @@ def _draw_dash_icon(target: pygame.Surface, colored: bool) -> None:
     palette = {
         "1": (255, 255, 255, 255) if colored else (150, 150, 150, 255),
         "2": (210, 240, 255, 255) if colored else (130, 130, 130, 255),
+    }
+    _draw_pixel_pattern(target, pattern, palette)
+
+
+def _draw_ground_pound_icon(target: pygame.Surface, colored: bool) -> None:
+    pattern = [
+        "...4444...",
+        "...4224...",
+        "...4224...",
+        "...4444...",
+        "....11....",
+        "...1111...",
+        "..111111..",
+        "...1111...",
+        "....11....",
+        "...3333...",
+    ]
+    palette = {
+        "1": (248, 248, 248, 255) if colored else (145, 145, 145, 255),
+        "2": (180, 82, 55, 255) if colored else (120, 120, 120, 255),
+        "3": (142, 88, 54, 255) if colored else (115, 115, 115, 255),
+        "4": (206, 168, 122, 255) if colored else (135, 135, 135, 255),
     }
     _draw_pixel_pattern(target, pattern, palette)

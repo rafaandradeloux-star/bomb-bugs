@@ -9,12 +9,15 @@ SLASH_COLOR = (255, 255, 255)
 SQUARE_SIZE = 64
 ENEMY_SIZE = 56
 MAX_HP = 10
+ENEMY_MAX_HP = 15
 
 SPEED = 420  # pixels/second
 ENEMY_SPEED = 120  # pixels/second
 ENEMY_CHASE_SPEED = 185  # pixels/second
 ENEMY_JUMP_VELOCITY = -620  # pixels/second
 ENEMY_JUMP_COOLDOWN = 0.55  # seconds
+ENEMY_PATH_SAMPLE_INTERVAL = 0.04  # seconds
+ENEMY_PATH_MAX_POINTS = 80
 GRAVITY = 1700  # pixels/second^2
 JUMP_VELOCITY = -700  # pixels/second
 FLOOR_HEIGHT = 80
@@ -25,7 +28,7 @@ DASH_COOLDOWN = 0.45  # seconds
 TRAIL_LIFETIME = 0.12  # seconds
 TRAIL_SPAWN_INTERVAL = 0.08  # seconds (lower trail FPS = choppier look)
 
-SLASH_RANGE_X = 90
+SLASH_RANGE_X = 110
 SLASH_HEIGHT = 70
 SLASH_ACTIVE_TIME = 0.08  # seconds
 PLAYER_SLASH_COOLDOWN = 0.20  # seconds
@@ -50,6 +53,18 @@ SCREEN_SHAKE_DURATION = 0.28  # seconds
 SCREEN_SHAKE_INTENSITY = 5.0  # pixels
 FLOATING_TEXT_LIFETIME = 0.7  # seconds
 FLOATING_TEXT_RISE_SPEED = 70  # pixels/second
+GROUND_POUND_DAMAGE = 5
+GROUND_POUND_FALL_SPEED = 1450  # pixels/second
+GROUND_POUND_COOLDOWN = 5.0  # seconds
+GROUND_SPIKE_LIFETIME = 0.28  # seconds
+GROUND_DENT_LIFETIME = 0.75  # seconds
+GROUND_DENT_MAX_DEPTH = 18  # pixels
+RUBBLE_COUNT = 16
+RUBBLE_GRAVITY = 1200  # pixels/second^2
+RUBBLE_LIFETIME_MIN = 0.35  # seconds
+RUBBLE_LIFETIME_MAX = 0.7  # seconds
+RUBBLE_SPEED_X = 290  # pixels/second
+RUBBLE_SPEED_Y = 680  # pixels/second
 
 RESPAWN_DELAY = 2.0  # seconds
 RESPAWN_ANIM_TIME = 0.9  # seconds

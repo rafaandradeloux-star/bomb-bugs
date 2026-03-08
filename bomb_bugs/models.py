@@ -71,6 +71,33 @@ class MushroomCloud:
 
 
 @dataclass
+class GroundSpike:
+    x: float
+    y: float
+    life: float
+    max_life: float
+
+
+@dataclass
+class GroundDent:
+    x: float
+    y: float
+    life: float
+    max_life: float
+
+
+@dataclass
+class RubbleParticle:
+    x: float
+    y: float
+    vx: float
+    vy: float
+    life: float
+    max_life: float
+    size: float
+
+
+@dataclass
 class Actor:
     rect: pygame.Rect
     color: tuple[int, int, int]
@@ -94,6 +121,7 @@ class PlayerState:
     dash_cooldown_left: float = 0.0
     heal_cooldown_left: float = 0.0
     bomb_cooldown_left: float = 0.0
+    ground_pound_cooldown_left: float = 0.0
     trail_spawn_timer: float = 0.0
     bomb_trail_spawn_timer: float = 0.0
     dash_trail: list[DustParticle] = field(default_factory=list)
@@ -102,8 +130,12 @@ class PlayerState:
     bombs: list[Bomb] = field(default_factory=list)
     floating_texts: list[FloatingText] = field(default_factory=list)
     mushroom_clouds: list[MushroomCloud] = field(default_factory=list)
+    ground_spikes: list[GroundSpike] = field(default_factory=list)
+    ground_dents: list[GroundDent] = field(default_factory=list)
+    rubble_particles: list[RubbleParticle] = field(default_factory=list)
     shake_time_left: float = 0.0
     shake_phase: float = 0.0
+    ground_pound_active: bool = False
 
 
 @dataclass
@@ -114,3 +146,5 @@ class EnemyAI:
     velocity_y: float = 0.0
     is_grounded: bool = True
     jump_cooldown_left: float = 0.0
+    path_sample_timer: float = 0.0
+    path_points: list[tuple[float, float]] = field(default_factory=list)
