@@ -177,4 +177,24 @@ Controls:
 
 - Move left: `Left Arrow` or `A`
 - Move right: `Right Arrow` or `D`
+- Jump: `Space`, `W`, or `Up Arrow`
+- Dash: `Left Shift` or `Right Shift`
+- Slash attack: `Left Mouse Click`
+- Throw bomb (5 damage, 5s cooldown): `F`
+- Heal + green floor splash: `E`
 - Quit: close the game window
+
+## Code Structure (Modularized)
+
+The gameplay code was split into focused modules so it is easier to read and extend:
+
+- `main.py`: thin entrypoint that starts the game.
+- `bomb_bugs/game.py`: main game loop and high-level flow.
+- `bomb_bugs/config.py`: constants and tuning values (movement, combat, timing).
+- `bomb_bugs/models.py`: shared data models (`Actor`, particles, state objects).
+- `bomb_bugs/world.py`: platform creation and landing/collision helpers.
+- `bomb_bugs/combat.py`: slash hitbox construction.
+- `bomb_bugs/effects.py`: slash visuals, dust death effect, reverse-dust respawn effect, dash trail.
+- `bomb_bugs/ui.py`: health bars and debug HUD text.
+
+If you want to tune game feel quickly, start with `bomb_bugs/config.py`.

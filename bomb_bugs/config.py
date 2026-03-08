@@ -1,0 +1,63 @@
+WIDTH, HEIGHT = 960, 540
+BACKGROUND = (135, 206, 235)  # sky blue
+SQUARE_COLOR = (255, 200, 80)
+ENEMY_COLOR = (180, 70, 70)
+TEXT_COLOR = (20, 20, 20)
+PLATFORM_COLOR = (205, 170, 125)  # light brown
+SLASH_COLOR = (255, 255, 255)
+
+SQUARE_SIZE = 64
+ENEMY_SIZE = 56
+MAX_HP = 10
+
+SPEED = 420  # pixels/second
+ENEMY_SPEED = 120  # pixels/second
+ENEMY_CHASE_SPEED = 185  # pixels/second
+ENEMY_JUMP_VELOCITY = -620  # pixels/second
+ENEMY_JUMP_COOLDOWN = 0.55  # seconds
+GRAVITY = 1700  # pixels/second^2
+JUMP_VELOCITY = -700  # pixels/second
+FLOOR_HEIGHT = 80
+
+DASH_SPEED = 980  # pixels/second
+DASH_DURATION = 0.14  # seconds
+DASH_COOLDOWN = 0.45  # seconds
+TRAIL_LIFETIME = 0.12  # seconds
+TRAIL_SPAWN_INTERVAL = 0.08  # seconds (lower trail FPS = choppier look)
+
+SLASH_RANGE_X = 90
+SLASH_HEIGHT = 70
+SLASH_ACTIVE_TIME = 0.08  # seconds
+PLAYER_SLASH_COOLDOWN = 0.20  # seconds
+ENEMY_SLASH_COOLDOWN = 1.05  # seconds
+MOON_MIN_RADIUS = 14
+MOON_MAX_RADIUS = 60
+HEAL_AMOUNT = 2
+HEAL_COOLDOWN = 2.0  # seconds
+HEAL_SPLASH_TIME = 0.42  # seconds
+BOMB_DAMAGE = 5
+BOMB_COOLDOWN = 5.0  # seconds
+BOMB_SPEED_X = 520  # pixels/second
+BOMB_SPEED_Y = -360  # pixels/second
+BOMB_GRAVITY = 1100  # pixels/second^2
+BOMB_RADIUS = 14
+BOMB_HITBOX_RADIUS = 20
+BOMB_LIFETIME = 2.4  # seconds
+BOMB_TRAIL_SPAWN_INTERVAL = 0.04  # seconds
+BOMB_HOMING_SPEED = 980  # pixels/second
+FLOATING_TEXT_LIFETIME = 0.7  # seconds
+FLOATING_TEXT_RISE_SPEED = 70  # pixels/second
+
+RESPAWN_DELAY = 2.0  # seconds
+RESPAWN_ANIM_TIME = 0.9  # seconds
+DUST_COUNT = 140
+DUST_LIFETIME_MIN = 0.7  # seconds
+DUST_LIFETIME_MAX = 1.5  # seconds
+DUST_DRIFT_X = 140  # pixels/second
+DUST_DRIFT_Y = 90  # pixels/second
+
+HEALTH_BAR_WIDTH = 64
+HEALTH_BAR_HEIGHT = 8
+
+PLAYER_RESPAWN_TEXT_Y = 208
+ENEMY_RESPAWN_TEXT_Y = 240
