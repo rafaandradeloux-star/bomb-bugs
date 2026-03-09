@@ -9,6 +9,7 @@ from .config import (
     ENEMY_HIT_FLASH_DURATION,
     GROUND_POUND_COOLDOWN,
     GROUND_POUND_DAMAGE,
+    HEAL_AMOUNT,
     MAX_HP,
     SPEED,
 )
@@ -128,6 +129,7 @@ class Actor:
     slash_damage: int = 1
     bomb_damage: int = BOMB_DAMAGE
     ground_pound_damage: int = GROUND_POUND_DAMAGE
+    heal_amount: int = HEAL_AMOUNT
     bomb_hits_required: float = BOMB_COOLDOWN
     bomb_charge_hits: float = BOMB_COOLDOWN
     ground_pound_hits_required: float = GROUND_POUND_COOLDOWN
@@ -135,8 +137,10 @@ class Actor:
     move_speed: float = SPEED
     dash_duration: float = DASH_DURATION
     special_stun_duration: float = 0.0
+    special_invincible_duration: float = 0.0
     special_hits_required: float = 0.0
     special_charge_hits: float = 0.0
+    invincible_time_left: float = 0.0
     hit_flash_time: float = 0.0
     hit_flash_duration: float = ENEMY_HIT_FLASH_DURATION
     facing_dir: int = 1
@@ -182,6 +186,7 @@ class EnemyAI:
     knockback_velocity_x: float = 0.0
     speed_scale: float = 1.0
     stun_time_left: float = 0.0
+    web_unwrap_blip_time: float = 0.0
     poison_ticks_left: int = 0
     poison_tick_timer: float = 0.0
     path_sample_timer: float = 0.0

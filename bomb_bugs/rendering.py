@@ -9,6 +9,7 @@ from .config import (
     SCREEN_SHAKE_DURATION,
     SCREEN_SHAKE_INTENSITY,
     SQUARE_COLOR,
+    WEB_UNWRAP_BLIP_DURATION,
 )
 from .effects import (
     draw_crescent_slash,
@@ -22,7 +23,7 @@ from .effects import (
     draw_respawn_particles,
     draw_rubble_particles,
 )
-from .models import Actor, PlayerState
+from .models import Actor, EnemyAI, PlayerState
 from .ui import draw_ability_boxes, draw_floating_texts, draw_health_bar
 
 
@@ -33,6 +34,7 @@ def render_frame(
     platforms: list[pygame.Rect],
     player: Actor,
     enemy: Actor,
+    enemy_ai: EnemyAI,
     player_state: PlayerState,
     present: bool = True,
 ) -> None:
@@ -48,6 +50,11 @@ def render_frame(
     draw_ground_spikes(scene, player_state.ground_spikes)
     draw_rubble_particles(scene, player_state.rubble_particles)
     draw_mushroom_clouds(scene, player_state.mushroom_clouds)
+    special_icon = None
+    if player.special_stun_duration > 0.0:
+        special_icon = "web"
+    elif player.special_invincible_duration > 0.0:
+        special_icon = "shield"
     draw_ability_boxes(
         scene,
         player_state.dash_cooldown_left,
@@ -58,6 +65,7 @@ def render_frame(
         player.ground_pound_hits_required,
         player.special_charge_hits,
         player.special_hits_required,
+        special_icon,
     )
 
     for bomb in player_state.bombs:
@@ -86,6 +94,13 @@ def render_frame(
     if enemy.alive or enemy_walking_in:
         enemy_draw_color = _flash_tinted_color(enemy.color, enemy.hit_flash_time, enemy.hit_flash_duration)
         pygame.draw.rect(scene, enemy_draw_color, enemy.rect)
+        wrap_alpha = 0
+        if enemy_ai.stun_time_left > 0.0:
+            wrap_alpha = 255
+        elif enemy_ai.web_unwrap_blip_time > 0.0:
+            wrap_alpha = int(255 * (enemy_ai.web_unwrap_blip_time / WEB_UNWRAP_BLIP_DURATION))
+        if wrap_alpha > 0:
+            _draw_web_wrap_overlay(scene, enemy.rect, wrap_alpha)
         if enemy.alive:
             draw_health_bar(scene, enemy.rect, enemy.hp, enemy.max_hp)
 
@@ -132,6 +147,30 @@ def _flash_tinted_color(base: tuple[int, int, int], time_left: float, duration: 
 
 def _is_respawn_walking(actor: Actor) -> bool:
     return not actor.alive and 0.0 < actor.respawn_timer <= RESPAWN_ANIM_TIME
+
+
+def _draw_web_wrap_overlay(surface: pygame.Surface, rect: pygame.Rect, alpha: int) -> None:
+    alpha = max(0, min(255, alpha))
+    if alpha <= 0:
+        return
+    overlay = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    overlay.fill((246, 246, 246, alpha))
+
+    # Layered texture panels to suggest stacked web wraps.
+    panel_alpha = min(255, int(alpha * 0.72))
+    pygame.draw.rect(overlay, (228, 228, 228, panel_alpha), pygame.Rect(3, 3, rect.width - 6, rect.height - 6), 2)
+    pygame.draw.rect(overlay, (236, 236, 236, panel_alpha), pygame.Rect(8, 8, rect.width - 16, rect.height - 16), 2)
+    pygame.draw.rect(overlay, (220, 220, 220, panel_alpha), pygame.Rect(13, 13, rect.width - 26, rect.height - 26), 1)
+
+    # Strands crossing to create a layered cocoon look.
+    strand_alpha = min(255, int(alpha * 0.85))
+    w, h = rect.width, rect.height
+    pygame.draw.line(overlay, (255, 255, 255, strand_alpha), (0, h // 2), (w, h // 2), 2)
+    pygame.draw.line(overlay, (244, 244, 244, strand_alpha), (w // 2, 0), (w // 2, h), 2)
+    pygame.draw.line(overlay, (250, 250, 250, strand_alpha), (2, 2), (w - 2, h - 2), 1)
+    pygame.draw.line(overlay, (250, 250, 250, strand_alpha), (2, h - 2), (w - 2, 2), 1)
+
+    surface.blit(overlay, rect.topleft)
 
 
 def draw_pause_overlay(

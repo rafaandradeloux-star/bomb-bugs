@@ -1,4 +1,5 @@
 import pygame
+from typing import Optional
 
 from .config import (
     DASH_COOLDOWN,
@@ -87,9 +88,10 @@ def draw_ability_boxes(
     ground_pound_hits_required: float,
     special_charge_hits: float = 0.0,
     special_hits_required: float = 0.0,
+    special_icon: Optional[str] = None,
 ) -> None:
     box_size = 52
-    padding = 12
+    padding = 56
     base_x = 18
     base_y = HEIGHT - FLOOR_HEIGHT + (FLOOR_HEIGHT - box_size) // 2
 
@@ -116,12 +118,18 @@ def draw_ability_boxes(
     _draw_icon_with_recharge(surface, bomb_rect, bomb_ratio, _draw_bomb_icon)
     _draw_icon_with_recharge(surface, heal_rect, heal_ratio, _draw_potion_icon)
     _draw_icon_with_recharge(surface, pound_rect, pound_ratio, _draw_ground_pound_icon)
+    _draw_key_label(surface, dash_rect, "SHIFT")
+    _draw_key_label(surface, bomb_rect, "F")
+    _draw_key_label(surface, heal_rect, "E")
+    _draw_key_label(surface, pound_rect, "Q")
 
     if special_hits_required > 0.0:
         special_ratio = max(0.0, min(1.0, special_charge_hits / special_hits_required))
         special_rect = pygame.Rect(base_x + (box_size + padding) * 4, base_y, box_size, box_size)
         _draw_box(surface, special_rect)
-        _draw_icon_with_recharge(surface, special_rect, special_ratio, _draw_web_icon)
+        icon_drawer = _draw_shield_icon if special_icon == "shield" else _draw_web_icon
+        _draw_icon_with_recharge(surface, special_rect, special_ratio, icon_drawer)
+        _draw_key_label(surface, special_rect, "SPACE")
 
 
 def _draw_box(surface: pygame.Surface, rect: pygame.Rect) -> None:
@@ -156,6 +164,23 @@ def _draw_icon_with_recharge(
         clip_rect = pygame.Rect(0, size - color_height, size, color_height)
         colored_part = icon_surface.subsurface(clip_rect)
         surface.blit(colored_part, (rect.x + 6, rect.y + 6 + size - color_height))
+
+
+def _draw_key_label(surface: pygame.Surface, rect: pygame.Rect, key: str) -> None:
+    key_font = create_pixel_font(10)
+    glyph_small = key_font.render(key, False, (244, 244, 244))
+    outline_small = key_font.render(key, False, (24, 24, 24))
+    scale = 2
+    glyph = pygame.transform.scale(glyph_small, (glyph_small.get_width() * scale, glyph_small.get_height() * scale))
+    outline = pygame.transform.scale(
+        outline_small,
+        (outline_small.get_width() * scale, outline_small.get_height() * scale),
+    )
+    x = rect.right + 10
+    y = rect.centery - glyph.get_height() // 2
+    for ox, oy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        surface.blit(outline, (x + ox, y + oy))
+    surface.blit(glyph, (x, y))
 
 
 def _draw_pixel_pattern(
@@ -279,5 +304,26 @@ def _draw_web_icon(target: pygame.Surface, colored: bool) -> None:
         "1": (245, 245, 245, 255) if colored else (145, 145, 145, 255),
         "2": (223, 223, 223, 255) if colored else (130, 130, 130, 255),
         "3": (255, 255, 255, 255) if colored else (160, 160, 160, 255),
+    }
+    _draw_pixel_pattern(target, pattern, palette)
+
+
+def _draw_shield_icon(target: pygame.Surface, colored: bool) -> None:
+    pattern = [
+        "...1111...",
+        "..122221..",
+        ".12333321.",
+        ".12333321.",
+        ".12333321.",
+        "..133331..",
+        "..133331..",
+        "...1331...",
+        "....11....",
+        "..........",
+    ]
+    palette = {
+        "1": (219, 233, 246, 255) if colored else (150, 150, 150, 255),
+        "2": (132, 166, 206, 255) if colored else (125, 125, 125, 255),
+        "3": (59, 92, 144, 255) if colored else (105, 105, 105, 255),
     }
     _draw_pixel_pattern(target, pattern, palette)

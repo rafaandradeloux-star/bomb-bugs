@@ -112,15 +112,25 @@ def run_game() -> None:
         "spider": 4,
         "rhino_beetle": 5,
     }
+    character_heal_amount = {
+        "mantis": 2,
+        "spider": 2,
+        "rhino_beetle": 1,
+    }
     character_special_stun_duration = {
         "mantis": 0.0,
         "spider": 1.5,
         "rhino_beetle": 0.0,
     }
+    character_special_invincible_duration = {
+        "mantis": 0.0,
+        "spider": 0.0,
+        "rhino_beetle": 2.0,
+    }
     character_special_hits_required = {
         "mantis": 0.0,
-        "spider": 6.5,
-        "rhino_beetle": 0.0,
+        "spider": 10.0,
+        "rhino_beetle": 10.0,
     }
     character_max_hp = {
         "mantis": 10,
@@ -135,9 +145,11 @@ def run_game() -> None:
     player.dash_duration = character_dash_duration[selected_character]
     player.bomb_damage = character_bomb_damage[selected_character]
     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+    player.heal_amount = character_heal_amount[selected_character]
     player.bomb_charge_hits = player.bomb_hits_required
     player.ground_pound_charge_hits = player.ground_pound_hits_required
     player.special_stun_duration = character_special_stun_duration[selected_character]
+    player.special_invincible_duration = character_special_invincible_duration[selected_character]
     player.special_hits_required = character_special_hits_required[selected_character]
     player.special_charge_hits = player.special_hits_required
 
@@ -207,9 +219,11 @@ def run_game() -> None:
                     player.dash_duration = character_dash_duration[selected_character]
                     player.bomb_damage = character_bomb_damage[selected_character]
                     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                    player.heal_amount = character_heal_amount[selected_character]
                     player.bomb_charge_hits = player.bomb_hits_required
                     player.ground_pound_charge_hits = player.ground_pound_hits_required
                     player.special_stun_duration = character_special_stun_duration[selected_character]
+                    player.special_invincible_duration = character_special_invincible_duration[selected_character]
                     player.special_hits_required = character_special_hits_required[selected_character]
                     player.special_charge_hits = player.special_hits_required
                 elif spider_card_rect.collidepoint(event.pos):
@@ -222,9 +236,11 @@ def run_game() -> None:
                     player.dash_duration = character_dash_duration[selected_character]
                     player.bomb_damage = character_bomb_damage[selected_character]
                     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                    player.heal_amount = character_heal_amount[selected_character]
                     player.bomb_charge_hits = player.bomb_hits_required
                     player.ground_pound_charge_hits = player.ground_pound_hits_required
                     player.special_stun_duration = character_special_stun_duration[selected_character]
+                    player.special_invincible_duration = character_special_invincible_duration[selected_character]
                     player.special_hits_required = character_special_hits_required[selected_character]
                     player.special_charge_hits = player.special_hits_required
                 elif rhino_card_rect.collidepoint(event.pos):
@@ -237,9 +253,11 @@ def run_game() -> None:
                     player.dash_duration = character_dash_duration[selected_character]
                     player.bomb_damage = character_bomb_damage[selected_character]
                     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                    player.heal_amount = character_heal_amount[selected_character]
                     player.bomb_charge_hits = player.bomb_hits_required
                     player.ground_pound_charge_hits = player.ground_pound_hits_required
                     player.special_stun_duration = character_special_stun_duration[selected_character]
+                    player.special_invincible_duration = character_special_invincible_duration[selected_character]
                     player.special_hits_required = character_special_hits_required[selected_character]
                     player.special_charge_hits = player.special_hits_required
                 elif character_select_back_rect.collidepoint(event.pos):
@@ -290,7 +308,7 @@ def run_game() -> None:
             continue
 
         if paused:
-            render_frame(screen, font, floating_text_font, platforms, player, enemy, player_state, present=False)
+            render_frame(screen, font, floating_text_font, platforms, player, enemy, enemy_ai, player_state, present=False)
             draw_pause_overlay(
                 screen,
                 pause_font,
@@ -309,6 +327,6 @@ def run_game() -> None:
         update_enemy(enemy, enemy_ai, player, player_state, platforms, dt)
         resolve_combat(player, enemy, enemy_ai, player_state)
 
-        render_frame(screen, font, floating_text_font, platforms, player, enemy, player_state)
+        render_frame(screen, font, floating_text_font, platforms, player, enemy, enemy_ai, player_state)
 
     pygame.quit()

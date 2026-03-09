@@ -48,6 +48,7 @@ from .config import (
     WEB_PROJECTILE_LIFETIME,
     WEB_PROJECTILE_RADIUS,
     WEB_PROJECTILE_SPEED,
+    WEB_UNWRAP_BLIP_DURATION,
     WIDTH,
 )
 from .effects import (
@@ -82,6 +83,7 @@ def tick_timers(player: Actor, enemy: Actor, player_state: PlayerState, dt: floa
 
     player.slash_time_left = max(0.0, player.slash_time_left - dt)
     player.slash_cooldown_left = max(0.0, player.slash_cooldown_left - dt)
+    player.invincible_time_left = max(0.0, player.invincible_time_left - dt)
     player.hit_flash_time = max(0.0, player.hit_flash_time - dt)
     enemy.slash_time_left = max(0.0, enemy.slash_time_left - dt)
     enemy.slash_cooldown_left = max(0.0, enemy.slash_cooldown_left - dt)
@@ -134,6 +136,7 @@ def handle_respawns(
             player.respawn_particles.clear()
             player.slash_time_left = 0.0
             player.slash_cooldown_left = 0.0
+            player.invincible_time_left = 0.0
             player_state.dash_time_left = 0.0
             player_state.ground_pound_active = False
             player_state.bombs.clear()
@@ -146,8 +149,11 @@ def handle_respawns(
         if 0.0 < enemy.respawn_timer <= RESPAWN_ANIM_TIME:
             progress = 1.0 - (enemy.respawn_timer / RESPAWN_ANIM_TIME)
             eased = 1.0 - pow(1.0 - progress, 3.0)  # Ease-out: fast start, slow finish.
-            start_center_x = WIDTH * 0.875
-            start_x = int(start_center_x - enemy.rect.width * 0.5)
+            player_start_center_x = WIDTH * 0.125
+            player_start_x = int(player_start_center_x - player.rect.width * 0.5)
+            travel_distance = player_spawn[0] - player_start_x
+            # Mirror player walk-in distance so enemy uses the same pacing feel.
+            start_x = int(enemy_spawn[0] + travel_distance)
             enemy.rect.x = int(start_x + (enemy_spawn[0] - start_x) * eased)
             enemy.rect.y = enemy_spawn[1]
             enemy.facing_dir = -1
@@ -165,6 +171,7 @@ def handle_respawns(
             enemy_ai.knockback_velocity_x = 0.0
             enemy_ai.speed_scale = 1.0
             enemy_ai.stun_time_left = 0.0
+            enemy_ai.web_unwrap_blip_time = 0.0
             enemy_ai.poison_ticks_left = 0
             enemy_ai.poison_tick_timer = 0.0
             enemy_ai.path_sample_timer = 0.0
@@ -179,6 +186,19 @@ def handle_input_event(
     player_state: PlayerState,
     platforms: list[pygame.Rect],
 ) -> None:
+    rhino_invincible_active = player.special_invincible_duration > 0.0 and player.invincible_time_left > 0.0
+
+    if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and player.special_invincible_duration > 0.0:
+        if (
+            player.alive
+            and player.invincible_time_left <= 0.0
+            and player.special_charge_hits >= player.special_hits_required
+        ):
+            player.invincible_time_left = player.special_invincible_duration
+            if player.special_hits_required > 0.0:
+                player.special_charge_hits = 0.0
+        return
+
     if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and player.special_stun_duration > 0.0:
         if player.alive and enemy.alive and player.special_charge_hits >= player.special_hits_required:
             player_state.web_projectiles.append(
@@ -194,6 +214,8 @@ def handle_input_event(
         return
 
     if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
+        if rhino_invincible_active:
+            return
         above_enemy = player.rect.bottom <= enemy.rect.top + 10
         if (
             player.alive
@@ -209,6 +231,8 @@ def handle_input_event(
         return
 
     if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
+        if rhino_invincible_active:
+            return
         if player.alive and _can_jump_from_platform(player.rect, player_state.is_grounded, platforms):
             player_state.velocity_y = JUMP_VELOCITY
             player_state.is_grounded = False
@@ -231,6 +255,8 @@ def handle_input_event(
         return
 
     if event.type == pygame.KEYDOWN and event.key in (pygame.K_LSHIFT, pygame.K_RSHIFT):
+        if rhino_invincible_active:
+            return
         if player.alive and player_state.dash_time_left <= 0.0 and player_state.dash_cooldown_left <= 0.0:
             keys = pygame.key.get_pressed()
             input_dir = 0
@@ -273,7 +299,7 @@ def handle_input_event(
     if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
         if player.alive and player_state.heal_cooldown_left <= 0.0:
             old_hp = player.hp
-            player.hp = min(player.max_hp, player.hp + HEAL_AMOUNT)
+            player.hp = min(player.max_hp, player.hp + player.heal_amount)
             player_state.heal_cooldown_left = HEAL_COOLDOWN
             splash_y = _find_floor_below(player.rect, platforms)
             player_state.heal_splashes.append(make_heal_splash(float(player.rect.centerx), float(splash_y)))
@@ -288,6 +314,12 @@ def update_player(
     dt: float,
 ) -> None:
     if not player.alive:
+        return
+
+    if player.special_invincible_duration > 0.0 and player.invincible_time_left > 0.0:
+        # Rhino invincibility is a planted stance: no movement while active.
+        player_state.dash_time_left = 0.0
+        player_state.velocity_y = 0.0
         return
 
     direction = 0
@@ -345,6 +377,8 @@ def update_enemy(
     if not enemy.alive:
         return
 
+    enemy_ai.web_unwrap_blip_time = max(0.0, enemy_ai.web_unwrap_blip_time - dt)
+
     if enemy_ai.poison_ticks_left > 0:
         enemy_ai.poison_tick_timer -= dt
         if enemy_ai.poison_tick_timer <= 0.0:
@@ -365,7 +399,10 @@ def update_enemy(
                 enemy_ai.poison_tick_timer = 0.0
                 return
 
+    prev_stun_time = enemy_ai.stun_time_left
     enemy_ai.stun_time_left = max(0.0, enemy_ai.stun_time_left - dt)
+    if prev_stun_time > 0.0 and enemy_ai.stun_time_left <= 0.0:
+        enemy_ai.web_unwrap_blip_time = WEB_UNWRAP_BLIP_DURATION
     enemy_ai.speed_scale = min(1.0, enemy_ai.speed_scale + ENEMY_HIT_SLOW_RECOVERY * dt)
     if abs(enemy_ai.knockback_velocity_x) > 0.0:
         enemy.rect.x += int(enemy_ai.knockback_velocity_x * dt)
@@ -440,6 +477,8 @@ def resolve_combat(player: Actor, enemy: Actor, enemy_ai: EnemyAI, player_state:
         enemy.slash_cooldown_left = ENEMY_SLASH_COOLDOWN
 
         if enemy_slash_rect.colliderect(player.rect):
+            if player.invincible_time_left > 0.0:
+                return
             old_hp = player.hp
             player.hp = max(0, player.hp - 1)
             player.hit_flash_time = player.hit_flash_duration
@@ -585,6 +624,7 @@ def _update_web_projectiles(
             hitbox = pygame.Rect(int(web.x - radius), int(web.y - radius), radius * 2, radius * 2)
             if hitbox.colliderect(enemy.rect):
                 enemy_ai.stun_time_left = max(enemy_ai.stun_time_left, player.special_stun_duration)
+                enemy_ai.web_unwrap_blip_time = 0.0
                 enemy_ai.knockback_velocity_x = 0.0
                 enemy_ai.speed_scale = 0.0
                 enemy.hit_flash_time = enemy.hit_flash_duration
