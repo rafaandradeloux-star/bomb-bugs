@@ -91,7 +91,12 @@ def _screen_shake_offset(time_left: float, phase: float) -> tuple[int, int]:
     return x, y
 
 
-def draw_pause_overlay(screen: pygame.Surface, pause_font: pygame.font.Font) -> None:
+def draw_pause_overlay(
+    screen: pygame.Surface,
+    pause_font: pygame.font.Font,
+    option_font: pygame.font.Font,
+    leave_hovered: bool,
+) -> pygame.Rect:
     shade = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
     shade.fill((0, 0, 0, 110))
     screen.blit(shade, (0, 0))
@@ -105,3 +110,47 @@ def draw_pause_overlay(screen: pygame.Surface, pause_font: pygame.font.Font) -> 
     for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2), (-2, 2), (2, -2)):
         screen.blit(outline, (x + ox, y + oy))
     screen.blit(label, (x, y))
+
+    leave_label = option_font.render("Leave", False, (255, 255, 255) if leave_hovered else (230, 230, 230))
+    leave_outline = option_font.render("Leave", False, (24, 24, 24))
+    leave_rect = leave_label.get_rect(center=(screen.get_width() // 2, 210))
+    box = leave_rect.inflate(44, 26)
+    fill = (124, 86, 58) if leave_hovered else (98, 67, 46)
+    pygame.draw.rect(screen, fill, box)
+    pygame.draw.rect(screen, (34, 24, 17), box, 4)
+    for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        screen.blit(leave_outline, (leave_rect.x + ox, leave_rect.y + oy))
+    screen.blit(leave_label, leave_rect)
+
+    return box
+
+
+def draw_main_menu(
+    screen: pygame.Surface,
+    title_font: pygame.font.Font,
+    option_font: pygame.font.Font,
+    play_hovered: bool,
+) -> pygame.Rect:
+    screen.fill(BACKGROUND)
+
+    title = title_font.render("BOMB BUGS", False, (255, 255, 255))
+    title_outline = title_font.render("BOMB BUGS", False, (38, 38, 38))
+    title_x = (screen.get_width() - title.get_width()) // 2
+    title_y = 112
+    for ox, oy in ((-3, 0), (3, 0), (0, -3), (0, 3), (-3, -3), (3, 3), (-3, 3), (3, -3)):
+        screen.blit(title_outline, (title_x + ox, title_y + oy))
+    screen.blit(title, (title_x, title_y))
+
+    play_label = option_font.render("Play", False, (255, 255, 255) if play_hovered else (230, 230, 230))
+    play_outline = option_font.render("Play", False, (24, 24, 24))
+    play_rect = play_label.get_rect(center=(screen.get_width() // 2, 300))
+    box = play_rect.inflate(44, 26)
+    fill = (124, 86, 58) if play_hovered else (98, 67, 46)
+    pygame.draw.rect(screen, fill, box)
+    pygame.draw.rect(screen, (34, 24, 17), box, 4)
+    for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        screen.blit(play_outline, (play_rect.x + ox, play_rect.y + oy))
+    screen.blit(play_label, play_rect)
+
+    pygame.display.flip()
+    return box

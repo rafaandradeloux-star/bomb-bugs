@@ -177,7 +177,7 @@ def handle_input_event(
         return
 
     if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP):
-        if player.alive and player_state.is_grounded:
+        if player.alive and _can_jump_from_platform(player.rect, player_state.is_grounded, platforms):
             player_state.velocity_y = JUMP_VELOCITY
             player_state.is_grounded = False
         return
@@ -300,42 +300,19 @@ def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list
         return
 
     if player.alive:
-        enemy_ai.path_sample_timer -= dt
-        if enemy_ai.path_sample_timer <= 0.0:
-            enemy_ai.path_points.append((float(player.rect.centerx), float(player.rect.centery)))
-            enemy_ai.path_sample_timer = ENEMY_PATH_SAMPLE_INTERVAL
-            if len(enemy_ai.path_points) > ENEMY_PATH_MAX_POINTS:
-                enemy_ai.path_points.pop(0)
-
-        target_x = float(player.rect.centerx)
-        target_y = float(player.rect.centery)
-        if enemy_ai.path_points:
-            target_x, target_y = enemy_ai.path_points[0]
-            reached_x = abs(target_x - enemy.rect.centerx) <= 16
-            reached_y = abs(target_y - enemy.rect.centery) <= 42
-            if reached_x and reached_y:
-                enemy_ai.path_points.pop(0)
-                if enemy_ai.path_points:
-                    target_x, target_y = enemy_ai.path_points[0]
-                else:
-                    target_x = float(player.rect.centerx)
-                    target_y = float(player.rect.centery)
-
-        dx = target_x - enemy.rect.centerx
-        if abs(dx) > 6:
+        dx = player.rect.centerx - enemy.rect.centerx
+        if abs(dx) > 8:
             enemy.facing_dir = 1 if dx > 0 else -1
             enemy.rect.x += int(enemy.facing_dir * ENEMY_CHASE_SPEED * dt)
 
         enemy_ai.jump_cooldown_left = max(0.0, enemy_ai.jump_cooldown_left - dt)
-        target_is_higher = target_y + 12 < enemy.rect.centery
-        close_enough = abs(dx) < 280
-        if enemy_ai.is_grounded and enemy_ai.jump_cooldown_left <= 0.0 and target_is_higher and close_enough:
+        player_is_higher = player.rect.centery + 12 < enemy.rect.centery
+        close_enough = abs(dx) < 260
+        if enemy_ai.is_grounded and enemy_ai.jump_cooldown_left <= 0.0 and player_is_higher and close_enough:
             enemy_ai.velocity_y = ENEMY_JUMP_VELOCITY
             enemy_ai.is_grounded = False
             enemy_ai.jump_cooldown_left = ENEMY_JUMP_COOLDOWN
     else:
-        enemy_ai.path_points.clear()
-        enemy_ai.path_sample_timer = 0.0
         enemy.rect.x += int(enemy_ai.patrol_dir * ENEMY_SPEED * dt)
         if enemy.rect.x < int(enemy_ai.patrol_min):
             enemy.rect.x = int(enemy_ai.patrol_min)
@@ -412,6 +389,30 @@ def _find_floor_below(rect: pygame.Rect, platforms: list[pygame.Rect]) -> int:
         if overlaps_x and is_below:
             floor_y = min(floor_y, platform.top)
     return floor_y
+
+
+def _is_on_floating_platform(rect: pygame.Rect, platforms: list[pygame.Rect]) -> bool:
+    if len(platforms) <= 1:
+        return False
+    feet_y = rect.bottom
+    for platform in platforms[1:]:
+        touches_top = abs(feet_y - platform.top) <= 2
+        overlaps_x = rect.right > platform.left and rect.left < platform.right
+        if touches_top and overlaps_x:
+            return True
+    return False
+
+
+def _can_jump_from_platform(rect: pygame.Rect, grounded: bool, platforms: list[pygame.Rect]) -> bool:
+    if grounded:
+        return True
+    feet_y = rect.bottom
+    for platform in platforms:
+        touches_top = abs(feet_y - platform.top) <= 3
+        overlaps_x = rect.right > platform.left and rect.left < platform.right
+        if touches_top and overlaps_x:
+            return True
+    return False
 
 
 def _update_bombs(player: Actor, enemy: Actor, player_state: PlayerState, dt: float) -> None:
