@@ -84,26 +84,32 @@ def run_game() -> None:
     selected_character = "mantis"
     character_colors = {
         "mantis": SQUARE_COLOR,
+        "spider": (180, 142, 97),
         "rhino_beetle": (34, 60, 126),
     }
     character_slash_damage = {
         "mantis": 2,
+        "spider": 1,
         "rhino_beetle": 1,
     }
     character_move_speed = {
         "mantis": 420.0,
+        "spider": 360.0,
         "rhino_beetle": 300.0,
     }
     character_dash_duration = {
         "mantis": 0.22,
+        "spider": 0.16,
         "rhino_beetle": 0.14,
     }
     character_bomb_damage = {
         "mantis": 3,
+        "spider": 5,
         "rhino_beetle": 5,
     }
     character_ground_pound_damage = {
         "mantis": 3,
+        "spider": 5,
         "rhino_beetle": 5,
     }
     player.color = character_colors[selected_character]
@@ -125,6 +131,7 @@ def run_game() -> None:
         character_select_button_rect = pygame.Rect(0, 0, 0, 0)
         character_select_back_rect = pygame.Rect(0, 0, 0, 0)
         mantis_card_rect = pygame.Rect(0, 0, 0, 0)
+        spider_card_rect = pygame.Rect(0, 0, 0, 0)
         rhino_card_rect = pygame.Rect(0, 0, 0, 0)
         leave_button_rect = pygame.Rect(0, 0, 0, 0)
         if in_menu:
@@ -135,10 +142,12 @@ def run_game() -> None:
         if in_character_select:
             back_probe_label = menu_option_font.render("Back", False, (255, 255, 255))
             character_select_back_rect = back_probe_label.get_rect(center=(WIDTH // 2, 470)).inflate(44, 26)
-            mantis_card_rect = pygame.Rect(0, 0, 280, 280)
-            mantis_card_rect.center = (WIDTH // 2 - 160, 265)
-            rhino_card_rect = pygame.Rect(0, 0, 280, 280)
-            rhino_card_rect.center = (WIDTH // 2 + 160, 265)
+            mantis_card_rect = pygame.Rect(0, 0, 220, 250)
+            mantis_card_rect.center = (WIDTH // 2 - 250, 255)
+            spider_card_rect = pygame.Rect(0, 0, 220, 250)
+            spider_card_rect.center = (WIDTH // 2, 255)
+            rhino_card_rect = pygame.Rect(0, 0, 220, 250)
+            rhino_card_rect.center = (WIDTH // 2 + 250, 255)
         if paused and not in_menu:
             leave_probe_label = menu_option_font.render("Leave", False, (255, 255, 255))
             leave_button_rect = leave_probe_label.get_rect(center=(WIDTH // 2, 210)).inflate(44, 26)
@@ -168,6 +177,14 @@ def run_game() -> None:
             elif in_character_select and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if mantis_card_rect.collidepoint(event.pos):
                     selected_character = "mantis"
+                    player.color = character_colors[selected_character]
+                    player.slash_damage = character_slash_damage[selected_character]
+                    player.move_speed = character_move_speed[selected_character]
+                    player.dash_duration = character_dash_duration[selected_character]
+                    player.bomb_damage = character_bomb_damage[selected_character]
+                    player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                elif spider_card_rect.collidepoint(event.pos):
+                    selected_character = "spider"
                     player.color = character_colors[selected_character]
                     player.slash_damage = character_slash_damage[selected_character]
                     player.move_speed = character_move_speed[selected_character]
@@ -204,7 +221,7 @@ def run_game() -> None:
                 paused = not paused
             else:
                 if not in_menu and not in_character_select and not paused:
-                    handle_input_event(event, player, enemy, player_state, platforms)
+                    handle_input_event(event, player, enemy, enemy_ai, player_state, platforms)
 
         if in_menu:
             draw_main_menu(
@@ -223,6 +240,7 @@ def run_game() -> None:
                 menu_option_font,
                 selected_character,
                 mantis_card_rect.collidepoint(mouse_pos),
+                spider_card_rect.collidepoint(mouse_pos),
                 rhino_card_rect.collidepoint(mouse_pos),
                 character_select_back_rect.collidepoint(mouse_pos),
             )
@@ -240,7 +258,7 @@ def run_game() -> None:
             continue
 
         tick_timers(player, enemy, player_state, dt)
-        update_particles(player, enemy, player_state, dt)
+        update_particles(player, enemy, enemy_ai, player_state, dt)
         handle_respawns(player, enemy, player_state, enemy_ai, player_spawn, enemy_spawn, dt)
 
         keys = pygame.key.get_pressed()

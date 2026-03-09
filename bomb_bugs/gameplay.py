@@ -5,6 +5,7 @@ import pygame
 
 from .combat import build_slash_rect
 from .config import (
+    BOMB_KNOCKBACK_SPEED,
     BOMB_COOLDOWN,
     BOMB_GRAVITY,
     BOMB_HITBOX_RADIUS,
@@ -17,8 +18,11 @@ from .config import (
     DASH_COOLDOWN,
     DASH_SPEED,
     ENEMY_CHASE_SPEED,
+    ENEMY_HIT_SLOW_MIN,
+    ENEMY_HIT_SLOW_RECOVERY,
     ENEMY_JUMP_COOLDOWN,
     ENEMY_JUMP_VELOCITY,
+    ENEMY_KNOCKBACK_DECEL,
     ENEMY_PATH_MAX_POINTS,
     ENEMY_PATH_SAMPLE_INTERVAL,
     ENEMY_SLASH_COOLDOWN,
@@ -33,6 +37,7 @@ from .config import (
     HEIGHT,
     JUMP_VELOCITY,
     PLAYER_SLASH_COOLDOWN,
+    PLAYER_SLASH_KNOCKBACK_SPEED,
     RESPAWN_ANIM_TIME,
     RESPAWN_DELAY,
     SCREEN_SHAKE_DURATION,
@@ -76,11 +81,14 @@ def tick_timers(player: Actor, enemy: Actor, player_state: PlayerState, dt: floa
 
     player.slash_time_left = max(0.0, player.slash_time_left - dt)
     player.slash_cooldown_left = max(0.0, player.slash_cooldown_left - dt)
+    player.special_cooldown_left = max(0.0, player.special_cooldown_left - dt)
+    player.hit_flash_time = max(0.0, player.hit_flash_time - dt)
     enemy.slash_time_left = max(0.0, enemy.slash_time_left - dt)
     enemy.slash_cooldown_left = max(0.0, enemy.slash_cooldown_left - dt)
+    enemy.hit_flash_time = max(0.0, enemy.hit_flash_time - dt)
 
 
-def update_particles(player: Actor, enemy: Actor, player_state: PlayerState, dt: float) -> None:
+def update_particles(player: Actor, enemy: Actor, enemy_ai: EnemyAI, player_state: PlayerState, dt: float) -> None:
     player_state.dash_trail = update_dust_particles(player_state.dash_trail, dt)
     player_state.bomb_trail = update_dust_particles(player_state.bomb_trail, dt)
     player_state.heal_splashes = update_heal_splashes(player_state.heal_splashes, dt)
@@ -93,7 +101,7 @@ def update_particles(player: Actor, enemy: Actor, player_state: PlayerState, dt:
     enemy.respawn_particles = update_respawn_particles(enemy.respawn_particles, dt)
     player_state.mushroom_clouds = update_mushroom_clouds(player_state.mushroom_clouds, dt)
     player_state.floating_texts = _update_floating_texts(player_state.floating_texts, dt)
-    _update_bombs(player, enemy, player_state, dt)
+    _update_bombs(player, enemy, enemy_ai, player_state, dt)
 
 
 def handle_respawns(
@@ -146,6 +154,9 @@ def handle_respawns(
             enemy_ai.velocity_y = 0.0
             enemy_ai.is_grounded = True
             enemy_ai.jump_cooldown_left = 0.0
+            enemy_ai.knockback_velocity_x = 0.0
+            enemy_ai.speed_scale = 1.0
+            enemy_ai.stun_time_left = 0.0
             enemy_ai.path_sample_timer = 0.0
             enemy_ai.path_points.clear()
 
@@ -154,9 +165,20 @@ def handle_input_event(
     event: pygame.event.Event,
     player: Actor,
     enemy: Actor,
+    enemy_ai: EnemyAI,
     player_state: PlayerState,
     platforms: list[pygame.Rect],
 ) -> None:
+    if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and player.special_stun_duration > 0.0:
+        if player.alive and enemy.alive and player.special_cooldown_left <= 0.0:
+            enemy_ai.stun_time_left = max(enemy_ai.stun_time_left, player.special_stun_duration)
+            enemy_ai.knockback_velocity_x = 0.0
+            enemy_ai.speed_scale = 0.0
+            player.special_cooldown_left = player.special_cooldown
+            enemy.hit_flash_time = enemy.hit_flash_duration
+            _spawn_status_text(player_state, enemy.rect, "STUN", (255, 235, 120))
+        return
+
     if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
         above_enemy = player.rect.bottom <= enemy.rect.top + 10
         if (
@@ -218,6 +240,9 @@ def handle_input_event(
             if enemy.alive and player_slash_rect.colliderect(enemy.rect):
                 old_hp = enemy.hp
                 enemy.hp = max(0, enemy.hp - player.slash_damage)
+                enemy.hit_flash_time = enemy.hit_flash_duration
+                enemy_ai.knockback_velocity_x = float(player.facing_dir * PLAYER_SLASH_KNOCKBACK_SPEED)
+                enemy_ai.speed_scale = ENEMY_HIT_SLOW_MIN
                 _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
                 if enemy.hp == 0:
                     enemy.alive = False
@@ -295,11 +320,22 @@ def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list
     if not enemy.alive:
         return
 
-    if player.alive:
+    enemy_ai.stun_time_left = max(0.0, enemy_ai.stun_time_left - dt)
+    enemy_ai.speed_scale = min(1.0, enemy_ai.speed_scale + ENEMY_HIT_SLOW_RECOVERY * dt)
+    if abs(enemy_ai.knockback_velocity_x) > 0.0:
+        enemy.rect.x += int(enemy_ai.knockback_velocity_x * dt)
+        if enemy_ai.knockback_velocity_x > 0.0:
+            enemy_ai.knockback_velocity_x = max(0.0, enemy_ai.knockback_velocity_x - ENEMY_KNOCKBACK_DECEL * dt)
+        else:
+            enemy_ai.knockback_velocity_x = min(0.0, enemy_ai.knockback_velocity_x + ENEMY_KNOCKBACK_DECEL * dt)
+
+    if enemy_ai.stun_time_left > 0.0:
+        enemy_ai.jump_cooldown_left = max(0.0, enemy_ai.jump_cooldown_left - dt)
+    elif player.alive:
         dx = player.rect.centerx - enemy.rect.centerx
         if abs(dx) > 8:
             enemy.facing_dir = 1 if dx > 0 else -1
-            enemy.rect.x += int(enemy.facing_dir * ENEMY_CHASE_SPEED * dt)
+            enemy.rect.x += int(enemy.facing_dir * ENEMY_CHASE_SPEED * enemy_ai.speed_scale * dt)
 
         enemy_ai.jump_cooldown_left = max(0.0, enemy_ai.jump_cooldown_left - dt)
         player_is_higher = player.rect.centery + 12 < enemy.rect.centery
@@ -309,7 +345,7 @@ def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list
             enemy_ai.is_grounded = False
             enemy_ai.jump_cooldown_left = ENEMY_JUMP_COOLDOWN
     else:
-        enemy.rect.x += int(enemy_ai.patrol_dir * ENEMY_SPEED * dt)
+        enemy.rect.x += int(enemy_ai.patrol_dir * ENEMY_SPEED * enemy_ai.speed_scale * dt)
         if enemy.rect.x < int(enemy_ai.patrol_min):
             enemy.rect.x = int(enemy_ai.patrol_min)
             enemy_ai.patrol_dir = 1
@@ -330,13 +366,14 @@ def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list
     enemy.rect.x = max(0, min(enemy.rect.x, WIDTH - enemy.rect.width))
 
 
-def resolve_combat(player: Actor, enemy: Actor, player_state: PlayerState) -> None:
+def resolve_combat(player: Actor, enemy: Actor, enemy_ai: EnemyAI, player_state: PlayerState) -> None:
     if not (player.alive and enemy.alive):
         return
 
     if player_state.ground_pound_active and player.rect.colliderect(enemy.rect):
         old_hp = enemy.hp
         enemy.hp = max(0, enemy.hp - player.ground_pound_damage)
+        enemy.hit_flash_time = enemy.hit_flash_duration
         _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
         player_state.shake_time_left = SCREEN_SHAKE_DURATION
         player_state.ground_pound_active = False
@@ -352,7 +389,7 @@ def resolve_combat(player: Actor, enemy: Actor, player_state: PlayerState) -> No
     dx = player.rect.centerx - enemy.rect.centerx
     in_attack_x = abs(dx) <= (SLASH_RANGE_X + 10)
     in_attack_y = abs(player.rect.centery - enemy.rect.centery) <= 70
-    if in_attack_x and in_attack_y and enemy.slash_cooldown_left <= 0.0:
+    if enemy_ai.stun_time_left <= 0.0 and in_attack_x and in_attack_y and enemy.slash_cooldown_left <= 0.0:
         enemy_slash_rect = build_slash_rect(enemy.rect, enemy.facing_dir)
         enemy.slash_time_left = SLASH_ACTIVE_TIME
         enemy.slash_cooldown_left = ENEMY_SLASH_COOLDOWN
@@ -360,6 +397,7 @@ def resolve_combat(player: Actor, enemy: Actor, player_state: PlayerState) -> No
         if enemy_slash_rect.colliderect(player.rect):
             old_hp = player.hp
             player.hp = max(0, player.hp - 1)
+            player.hit_flash_time = player.hit_flash_duration
             _spawn_floating_text(player_state, player.rect, old_hp - player.hp, is_heal=False)
             if player.hp == 0:
                 player.alive = False
@@ -411,7 +449,7 @@ def _can_jump_from_platform(rect: pygame.Rect, grounded: bool, platforms: list[p
     return False
 
 
-def _update_bombs(player: Actor, enemy: Actor, player_state: PlayerState, dt: float) -> None:
+def _update_bombs(player: Actor, enemy: Actor, enemy_ai: EnemyAI, player_state: PlayerState, dt: float) -> None:
     active_bombs: list[Bomb] = []
     for bomb in player_state.bombs:
         bomb.life -= dt
@@ -447,6 +485,10 @@ def _update_bombs(player: Actor, enemy: Actor, player_state: PlayerState, dt: fl
             if bomb_rect.colliderect(enemy.rect):
                 old_hp = enemy.hp
                 enemy.hp = max(0, enemy.hp - player.bomb_damage)
+                enemy.hit_flash_time = enemy.hit_flash_duration
+                knockback_dir = 1 if enemy.rect.centerx >= bomb.x else -1
+                enemy_ai.knockback_velocity_x = float(knockback_dir * BOMB_KNOCKBACK_SPEED)
+                enemy_ai.speed_scale = ENEMY_HIT_SLOW_MIN
                 player_state.mushroom_clouds.append(make_mushroom_cloud(float(enemy.rect.centerx), float(enemy.rect.bottom)))
                 player_state.shake_time_left = SCREEN_SHAKE_DURATION
                 _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
@@ -484,5 +526,24 @@ def _spawn_floating_text(player_state: PlayerState, rect: pygame.Rect, value: in
             max_life=FLOATING_TEXT_LIFETIME,
             text=f"+{value}" if is_heal else f"-{value}",
             color=(80, 250, 120) if is_heal else (255, 90, 90),
+        )
+    )
+
+
+def _spawn_status_text(
+    player_state: PlayerState,
+    rect: pygame.Rect,
+    text: str,
+    color: tuple[int, int, int],
+) -> None:
+    player_state.floating_texts.append(
+        FloatingText(
+            x=float(rect.centerx + random.randint(-8, 8)),
+            y=float(rect.top - 14),
+            vy=FLOATING_TEXT_RISE_SPEED,
+            life=FLOATING_TEXT_LIFETIME,
+            max_life=FLOATING_TEXT_LIFETIME,
+            text=text,
+            color=color,
         )
     )

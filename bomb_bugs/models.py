@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 import pygame
 
-from .config import BOMB_DAMAGE, DASH_DURATION, GROUND_POUND_DAMAGE, MAX_HP, SPEED
+from .config import BOMB_DAMAGE, DASH_DURATION, ENEMY_HIT_FLASH_DURATION, GROUND_POUND_DAMAGE, MAX_HP, SPEED
 
 
 @dataclass
@@ -112,6 +112,11 @@ class Actor:
     ground_pound_damage: int = GROUND_POUND_DAMAGE
     move_speed: float = SPEED
     dash_duration: float = DASH_DURATION
+    special_stun_duration: float = 0.0
+    special_cooldown: float = 0.0
+    special_cooldown_left: float = 0.0
+    hit_flash_time: float = 0.0
+    hit_flash_duration: float = ENEMY_HIT_FLASH_DURATION
     facing_dir: int = 1
     death_particles: list[DustParticle] = field(default_factory=list)
     respawn_particles: list[RespawnParticle] = field(default_factory=list)
@@ -151,5 +156,8 @@ class EnemyAI:
     velocity_y: float = 0.0
     is_grounded: bool = True
     jump_cooldown_left: float = 0.0
+    knockback_velocity_x: float = 0.0
+    speed_scale: float = 1.0
+    stun_time_left: float = 0.0
     path_sample_timer: float = 0.0
     path_points: list[tuple[float, float]] = field(default_factory=list)

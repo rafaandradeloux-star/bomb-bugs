@@ -54,12 +54,14 @@ def render_frame(
         pygame.draw.circle(scene, (250, 160, 40), (int(bomb.x - radius * 0.2), int(bomb.y - radius * 0.6)), 2)
 
     if player.alive:
-        pygame.draw.rect(scene, player.color, player.rect)
+        player_draw_color = _flash_tinted_color(player.color, player.hit_flash_time, player.hit_flash_duration)
+        pygame.draw.rect(scene, player_draw_color, player.rect)
         draw_health_bar(scene, player.rect, player.hp, player.max_hp)
         if player_state.ground_pound_active:
             draw_ground_pound_dive(scene, player.rect, player_state.velocity_y)
     if enemy.alive:
-        pygame.draw.rect(scene, enemy.color, enemy.rect)
+        enemy_draw_color = _flash_tinted_color(enemy.color, enemy.hit_flash_time, enemy.hit_flash_duration)
+        pygame.draw.rect(scene, enemy_draw_color, enemy.rect)
         draw_health_bar(scene, enemy.rect, enemy.hp, enemy.max_hp)
 
     draw_dust_particles(scene, player.death_particles, (170, 150, 130))
@@ -89,6 +91,18 @@ def _screen_shake_offset(time_left: float, phase: float) -> tuple[int, int]:
     x = int(math.sin(phase * 1.1) * strength)
     y = int(math.cos(phase * 0.9) * strength * 0.55)
     return x, y
+
+
+def _flash_tinted_color(base: tuple[int, int, int], time_left: float, duration: float) -> tuple[int, int, int]:
+    if duration <= 0.0 or time_left <= 0.0:
+        return base
+    t = max(0.0, min(1.0, time_left / duration))
+    flash = (255, 255, 255)
+    return (
+        int(base[0] * (1.0 - t) + flash[0] * t),
+        int(base[1] * (1.0 - t) + flash[1] * t),
+        int(base[2] * (1.0 - t) + flash[2] * t),
+    )
 
 
 def draw_pause_overlay(
@@ -177,6 +191,7 @@ def draw_character_select(
     option_font: pygame.font.Font,
     selected_character: str,
     mantis_hovered: bool,
+    spider_hovered: bool,
     rhino_hovered: bool,
     back_hovered: bool,
 ) -> None:
@@ -190,10 +205,13 @@ def draw_character_select(
         screen.blit(title_outline, (title_x + ox, title_y + oy))
     screen.blit(title, (title_x, title_y))
 
-    mantis_card = pygame.Rect(0, 0, 280, 280)
-    mantis_card.center = (screen.get_width() // 2 - 160, 265)
-    rhino_card = pygame.Rect(0, 0, 280, 280)
-    rhino_card.center = (screen.get_width() // 2 + 160, 265)
+    card_size = (220, 250)
+    mantis_card = pygame.Rect(0, 0, card_size[0], card_size[1])
+    mantis_card.center = (screen.get_width() // 2 - 250, 255)
+    spider_card = pygame.Rect(0, 0, card_size[0], card_size[1])
+    spider_card.center = (screen.get_width() // 2, 255)
+    rhino_card = pygame.Rect(0, 0, card_size[0], card_size[1])
+    rhino_card.center = (screen.get_width() // 2 + 250, 255)
 
     _draw_character_card(
         screen,
@@ -203,6 +221,15 @@ def draw_character_select(
         "mantis",
         selected_character == "mantis",
         mantis_hovered,
+    )
+    _draw_character_card(
+        screen,
+        option_font,
+        spider_card,
+        (180, 142, 97),
+        "spider",
+        selected_character == "spider",
+        spider_hovered,
     )
     _draw_character_card(
         screen,
@@ -244,7 +271,7 @@ def _draw_character_card(
     pygame.draw.rect(screen, border_color, card, border_width)
 
     square_box = pygame.Rect(0, 0, 128, 128)
-    square_box.center = (card.centerx, card.top + 105)
+    square_box.center = (card.centerx, card.top + 86)
     pygame.draw.rect(screen, (122, 94, 70), square_box)
     pygame.draw.rect(screen, (34, 24, 17), square_box, 3)
     sprite = pygame.Rect(0, 0, 74, 74)
@@ -252,7 +279,7 @@ def _draw_character_card(
     pygame.draw.rect(screen, square_color, sprite)
 
     label = option_font.render(label_text, False, (245, 245, 245))
-    label_rect = label.get_rect(center=(card.centerx, card.top + 212))
+    label_rect = label.get_rect(center=(card.centerx, card.top + 186))
     outline = option_font.render(label_text, False, (24, 24, 24))
     for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
         screen.blit(outline, (label_rect.x + ox, label_rect.y + oy))
