@@ -6,7 +6,6 @@ import pygame
 from .combat import build_slash_rect
 from .config import (
     BOMB_KNOCKBACK_SPEED,
-    BOMB_COOLDOWN,
     BOMB_GRAVITY,
     BOMB_HITBOX_RADIUS,
     BOMB_HOMING_SPEED,
@@ -30,7 +29,6 @@ from .config import (
     FLOATING_TEXT_LIFETIME,
     FLOATING_TEXT_RISE_SPEED,
     GRAVITY,
-    GROUND_POUND_COOLDOWN,
     GROUND_POUND_FALL_SPEED,
     HEAL_AMOUNT,
     HEAL_COOLDOWN,
@@ -43,7 +41,13 @@ from .config import (
     SCREEN_SHAKE_DURATION,
     SLASH_ACTIVE_TIME,
     SLASH_RANGE_X,
+    SPIDER_POISON_TICK_INTERVAL,
+    SPIDER_POISON_TOTAL_HITS,
     TRAIL_SPAWN_INTERVAL,
+    WEB_PROJECTILE_HITBOX_RADIUS,
+    WEB_PROJECTILE_LIFETIME,
+    WEB_PROJECTILE_RADIUS,
+    WEB_PROJECTILE_SPEED,
     WIDTH,
 )
 from .effects import (
@@ -53,7 +57,6 @@ from .effects import (
     make_rubble_particles,
     make_heal_splash,
     make_mushroom_cloud,
-    make_respawn_particles,
     make_trail_particle,
     update_dust_particles,
     update_ground_dents,
@@ -63,7 +66,7 @@ from .effects import (
     update_respawn_particles,
     update_rubble_particles,
 )
-from .models import Actor, Bomb, EnemyAI, FloatingText, PlayerState
+from .models import Actor, Bomb, EnemyAI, FloatingText, PlayerState, WebProjectile
 from .world import resolve_platform_landing
 
 
@@ -71,8 +74,6 @@ def tick_timers(player: Actor, enemy: Actor, player_state: PlayerState, dt: floa
     player_state.dash_time_left = max(0.0, player_state.dash_time_left - dt)
     player_state.dash_cooldown_left = max(0.0, player_state.dash_cooldown_left - dt)
     player_state.heal_cooldown_left = max(0.0, player_state.heal_cooldown_left - dt)
-    player_state.bomb_cooldown_left = max(0.0, player_state.bomb_cooldown_left - dt)
-    player_state.ground_pound_cooldown_left = max(0.0, player_state.ground_pound_cooldown_left - dt)
     player_state.shake_time_left = max(0.0, player_state.shake_time_left - dt)
     if player_state.shake_time_left > 0.0:
         player_state.shake_phase += dt * 34.0
@@ -81,7 +82,6 @@ def tick_timers(player: Actor, enemy: Actor, player_state: PlayerState, dt: floa
 
     player.slash_time_left = max(0.0, player.slash_time_left - dt)
     player.slash_cooldown_left = max(0.0, player.slash_cooldown_left - dt)
-    player.special_cooldown_left = max(0.0, player.special_cooldown_left - dt)
     player.hit_flash_time = max(0.0, player.hit_flash_time - dt)
     enemy.slash_time_left = max(0.0, enemy.slash_time_left - dt)
     enemy.slash_cooldown_left = max(0.0, enemy.slash_cooldown_left - dt)
@@ -102,6 +102,7 @@ def update_particles(player: Actor, enemy: Actor, enemy_ai: EnemyAI, player_stat
     player_state.mushroom_clouds = update_mushroom_clouds(player_state.mushroom_clouds, dt)
     player_state.floating_texts = _update_floating_texts(player_state.floating_texts, dt)
     _update_bombs(player, enemy, enemy_ai, player_state, dt)
+    _update_web_projectiles(player, enemy, enemy_ai, player_state, dt)
 
 
 def handle_respawns(
@@ -115,11 +116,14 @@ def handle_respawns(
 ) -> None:
     if not player.alive:
         player.respawn_timer = max(0.0, player.respawn_timer - dt)
-        if player.respawn_timer <= RESPAWN_ANIM_TIME and not player.respawn_particles:
-            player.respawn_particles = make_respawn_particles(
-                pygame.Rect(player_spawn[0], player_spawn[1], player.rect.width, player.rect.height),
-                player.color,
-            )
+        if 0.0 < player.respawn_timer <= RESPAWN_ANIM_TIME:
+            progress = 1.0 - (player.respawn_timer / RESPAWN_ANIM_TIME)
+            eased = 1.0 - pow(1.0 - progress, 3.0)  # Ease-out: fast start, slow finish.
+            start_center_x = WIDTH * 0.125
+            start_x = int(start_center_x - player.rect.width * 0.5)
+            player.rect.x = int(start_x + (player_spawn[0] - start_x) * eased)
+            player.rect.y = player_spawn[1]
+            player.facing_dir = 1
         if player.respawn_timer <= 0.0:
             player.alive = True
             player.hp = player.max_hp
@@ -133,16 +137,20 @@ def handle_respawns(
             player_state.dash_time_left = 0.0
             player_state.ground_pound_active = False
             player_state.bombs.clear()
+            player_state.web_projectiles.clear()
             player_state.bomb_trail.clear()
             player_state.floating_texts.clear()
 
     if not enemy.alive:
         enemy.respawn_timer = max(0.0, enemy.respawn_timer - dt)
-        if enemy.respawn_timer <= RESPAWN_ANIM_TIME and not enemy.respawn_particles:
-            enemy.respawn_particles = make_respawn_particles(
-                pygame.Rect(enemy_spawn[0], enemy_spawn[1], enemy.rect.width, enemy.rect.height),
-                enemy.color,
-            )
+        if 0.0 < enemy.respawn_timer <= RESPAWN_ANIM_TIME:
+            progress = 1.0 - (enemy.respawn_timer / RESPAWN_ANIM_TIME)
+            eased = 1.0 - pow(1.0 - progress, 3.0)  # Ease-out: fast start, slow finish.
+            start_center_x = WIDTH * 0.875
+            start_x = int(start_center_x - enemy.rect.width * 0.5)
+            enemy.rect.x = int(start_x + (enemy_spawn[0] - start_x) * eased)
+            enemy.rect.y = enemy_spawn[1]
+            enemy.facing_dir = -1
         if enemy.respawn_timer <= 0.0:
             enemy.alive = True
             enemy.hp = enemy.max_hp
@@ -157,6 +165,8 @@ def handle_respawns(
             enemy_ai.knockback_velocity_x = 0.0
             enemy_ai.speed_scale = 1.0
             enemy_ai.stun_time_left = 0.0
+            enemy_ai.poison_ticks_left = 0
+            enemy_ai.poison_tick_timer = 0.0
             enemy_ai.path_sample_timer = 0.0
             enemy_ai.path_points.clear()
 
@@ -170,13 +180,17 @@ def handle_input_event(
     platforms: list[pygame.Rect],
 ) -> None:
     if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and player.special_stun_duration > 0.0:
-        if player.alive and enemy.alive and player.special_cooldown_left <= 0.0:
-            enemy_ai.stun_time_left = max(enemy_ai.stun_time_left, player.special_stun_duration)
-            enemy_ai.knockback_velocity_x = 0.0
-            enemy_ai.speed_scale = 0.0
-            player.special_cooldown_left = player.special_cooldown
-            enemy.hit_flash_time = enemy.hit_flash_duration
-            _spawn_status_text(player_state, enemy.rect, "STUN", (255, 235, 120))
+        if player.alive and enemy.alive and player.special_charge_hits >= player.special_hits_required:
+            player_state.web_projectiles.append(
+                WebProjectile(
+                    x=float(player.rect.centerx),
+                    y=float(player.rect.centery - 6),
+                    life=float(WEB_PROJECTILE_LIFETIME),
+                    radius=WEB_PROJECTILE_RADIUS,
+                    speed=float(WEB_PROJECTILE_SPEED),
+                )
+            )
+            player.special_charge_hits = 0.0
         return
 
     if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
@@ -185,11 +199,11 @@ def handle_input_event(
             player.alive
             and enemy.alive
             and not player_state.is_grounded
-            and player_state.ground_pound_cooldown_left <= 0.0
+            and player.ground_pound_charge_hits >= player.ground_pound_hits_required
             and above_enemy
         ):
             player_state.ground_pound_active = True
-            player_state.ground_pound_cooldown_left = GROUND_POUND_COOLDOWN
+            player.ground_pound_charge_hits = 0.0
             player_state.dash_time_left = 0.0
             player_state.velocity_y = max(player_state.velocity_y, GROUND_POUND_FALL_SPEED)
         return
@@ -201,8 +215,8 @@ def handle_input_event(
         return
 
     if event.type == pygame.KEYDOWN and event.key == pygame.K_f:
-        if player.alive and player_state.bomb_cooldown_left <= 0.0:
-            player_state.bomb_cooldown_left = BOMB_COOLDOWN
+        if player.alive and player.bomb_charge_hits >= player.bomb_hits_required:
+            player.bomb_charge_hits = 0.0
             player_state.bombs.append(
                 Bomb(
                     x=float(player.rect.centerx + player.facing_dir * 18),
@@ -240,6 +254,10 @@ def handle_input_event(
             if enemy.alive and player_slash_rect.colliderect(enemy.rect):
                 old_hp = enemy.hp
                 enemy.hp = max(0, enemy.hp - player.slash_damage)
+                _grant_hit_charges(player, 1.0)
+                if player.special_stun_duration > 0.0:
+                    enemy_ai.poison_ticks_left = max(enemy_ai.poison_ticks_left, SPIDER_POISON_TOTAL_HITS - 1)
+                    enemy_ai.poison_tick_timer = SPIDER_POISON_TICK_INTERVAL
                 enemy.hit_flash_time = enemy.hit_flash_duration
                 enemy_ai.knockback_velocity_x = float(player.facing_dir * PLAYER_SLASH_KNOCKBACK_SPEED)
                 enemy_ai.speed_scale = ENEMY_HIT_SLOW_MIN
@@ -316,9 +334,36 @@ def update_player(
         player_state.ground_pound_active = False
 
 
-def update_enemy(enemy: Actor, enemy_ai: EnemyAI, player: Actor, platforms: list[pygame.Rect], dt: float) -> None:
+def update_enemy(
+    enemy: Actor,
+    enemy_ai: EnemyAI,
+    player: Actor,
+    player_state: PlayerState,
+    platforms: list[pygame.Rect],
+    dt: float,
+) -> None:
     if not enemy.alive:
         return
+
+    if enemy_ai.poison_ticks_left > 0:
+        enemy_ai.poison_tick_timer -= dt
+        if enemy_ai.poison_tick_timer <= 0.0:
+            old_hp = enemy.hp
+            enemy.hp = max(0, enemy.hp - 1)
+            enemy.hit_flash_time = enemy.hit_flash_duration
+            _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
+            _grant_hit_charges(player, 1.0)
+            enemy_ai.poison_ticks_left -= 1
+            enemy_ai.poison_tick_timer = SPIDER_POISON_TICK_INTERVAL
+            if enemy.hp == 0:
+                enemy.alive = False
+                enemy.respawn_timer = RESPAWN_DELAY + RESPAWN_ANIM_TIME
+                enemy.death_particles = make_dust_particles(enemy.rect)
+                enemy.respawn_particles.clear()
+                enemy.slash_time_left = 0.0
+                enemy_ai.poison_ticks_left = 0
+                enemy_ai.poison_tick_timer = 0.0
+                return
 
     enemy_ai.stun_time_left = max(0.0, enemy_ai.stun_time_left - dt)
     enemy_ai.speed_scale = min(1.0, enemy_ai.speed_scale + ENEMY_HIT_SLOW_RECOVERY * dt)
@@ -504,6 +549,52 @@ def _update_bombs(player: Actor, enemy: Actor, enemy_ai: EnemyAI, player_state: 
     player_state.bombs = active_bombs
 
 
+def _update_web_projectiles(
+    player: Actor,
+    enemy: Actor,
+    enemy_ai: EnemyAI,
+    player_state: PlayerState,
+    dt: float,
+) -> None:
+    active_projectiles: list[WebProjectile] = []
+    for web in player_state.web_projectiles:
+        web.life -= dt
+        if web.life <= 0.0:
+            continue
+
+        if enemy.alive:
+            dx = enemy.rect.centerx - web.x
+            dy = enemy.rect.centery - web.y
+            distance = math.hypot(dx, dy)
+            if distance > 0:
+                step = web.speed * dt
+                if distance <= step:
+                    web.x = float(enemy.rect.centerx)
+                    web.y = float(enemy.rect.centery)
+                else:
+                    web.x += (dx / distance) * step
+                    web.y += (dy / distance) * step
+        else:
+            web.y -= web.speed * dt * 0.35
+
+        if web.x < -30 or web.x > WIDTH + 30 or web.y < -30 or web.y > HEIGHT + 30:
+            continue
+
+        if enemy.alive:
+            radius = WEB_PROJECTILE_HITBOX_RADIUS
+            hitbox = pygame.Rect(int(web.x - radius), int(web.y - radius), radius * 2, radius * 2)
+            if hitbox.colliderect(enemy.rect):
+                enemy_ai.stun_time_left = max(enemy_ai.stun_time_left, player.special_stun_duration)
+                enemy_ai.knockback_velocity_x = 0.0
+                enemy_ai.speed_scale = 0.0
+                enemy.hit_flash_time = enemy.hit_flash_duration
+                _spawn_status_text(player_state, enemy.rect, "STUNNED", (255, 235, 120))
+                continue
+
+        active_projectiles.append(web)
+    player_state.web_projectiles = active_projectiles
+
+
 def _update_floating_texts(texts: list[FloatingText], dt: float) -> list[FloatingText]:
     active_texts: list[FloatingText] = []
     for text in texts:
@@ -547,3 +638,16 @@ def _spawn_status_text(
             color=color,
         )
     )
+
+
+def _grant_hit_charges(player: Actor, amount: float) -> None:
+    player.bomb_charge_hits = min(player.bomb_hits_required, player.bomb_charge_hits + amount)
+    player.ground_pound_charge_hits = min(
+        player.ground_pound_hits_required,
+        player.ground_pound_charge_hits + amount,
+    )
+    if player.special_hits_required > 0.0:
+        player.special_charge_hits = min(
+            player.special_hits_required,
+            player.special_charge_hits + amount,
+        )

@@ -99,25 +99,47 @@ def run_game() -> None:
     }
     character_dash_duration = {
         "mantis": 0.22,
-        "spider": 0.16,
+        "spider": 0.18,
         "rhino_beetle": 0.14,
     }
     character_bomb_damage = {
         "mantis": 3,
-        "spider": 5,
+        "spider": 4,
         "rhino_beetle": 5,
     }
     character_ground_pound_damage = {
         "mantis": 3,
-        "spider": 5,
+        "spider": 4,
         "rhino_beetle": 5,
     }
+    character_special_stun_duration = {
+        "mantis": 0.0,
+        "spider": 1.5,
+        "rhino_beetle": 0.0,
+    }
+    character_special_hits_required = {
+        "mantis": 0.0,
+        "spider": 6.5,
+        "rhino_beetle": 0.0,
+    }
+    character_max_hp = {
+        "mantis": 10,
+        "spider": 10,
+        "rhino_beetle": 15,
+    }
+    player.max_hp = character_max_hp[selected_character]
+    player.hp = player.max_hp
     player.color = character_colors[selected_character]
     player.slash_damage = character_slash_damage[selected_character]
     player.move_speed = character_move_speed[selected_character]
     player.dash_duration = character_dash_duration[selected_character]
     player.bomb_damage = character_bomb_damage[selected_character]
     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+    player.bomb_charge_hits = player.bomb_hits_required
+    player.ground_pound_charge_hits = player.ground_pound_hits_required
+    player.special_stun_duration = character_special_stun_duration[selected_character]
+    player.special_hits_required = character_special_hits_required[selected_character]
+    player.special_charge_hits = player.special_hits_required
 
     running = True
     paused = False
@@ -177,28 +199,49 @@ def run_game() -> None:
             elif in_character_select and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if mantis_card_rect.collidepoint(event.pos):
                     selected_character = "mantis"
+                    player.max_hp = character_max_hp[selected_character]
+                    player.hp = min(player.hp, player.max_hp)
                     player.color = character_colors[selected_character]
                     player.slash_damage = character_slash_damage[selected_character]
                     player.move_speed = character_move_speed[selected_character]
                     player.dash_duration = character_dash_duration[selected_character]
                     player.bomb_damage = character_bomb_damage[selected_character]
                     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                    player.bomb_charge_hits = player.bomb_hits_required
+                    player.ground_pound_charge_hits = player.ground_pound_hits_required
+                    player.special_stun_duration = character_special_stun_duration[selected_character]
+                    player.special_hits_required = character_special_hits_required[selected_character]
+                    player.special_charge_hits = player.special_hits_required
                 elif spider_card_rect.collidepoint(event.pos):
                     selected_character = "spider"
+                    player.max_hp = character_max_hp[selected_character]
+                    player.hp = min(player.hp, player.max_hp)
                     player.color = character_colors[selected_character]
                     player.slash_damage = character_slash_damage[selected_character]
                     player.move_speed = character_move_speed[selected_character]
                     player.dash_duration = character_dash_duration[selected_character]
                     player.bomb_damage = character_bomb_damage[selected_character]
                     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                    player.bomb_charge_hits = player.bomb_hits_required
+                    player.ground_pound_charge_hits = player.ground_pound_hits_required
+                    player.special_stun_duration = character_special_stun_duration[selected_character]
+                    player.special_hits_required = character_special_hits_required[selected_character]
+                    player.special_charge_hits = player.special_hits_required
                 elif rhino_card_rect.collidepoint(event.pos):
                     selected_character = "rhino_beetle"
+                    player.max_hp = character_max_hp[selected_character]
+                    player.hp = min(player.hp, player.max_hp)
                     player.color = character_colors[selected_character]
                     player.slash_damage = character_slash_damage[selected_character]
                     player.move_speed = character_move_speed[selected_character]
                     player.dash_duration = character_dash_duration[selected_character]
                     player.bomb_damage = character_bomb_damage[selected_character]
                     player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                    player.bomb_charge_hits = player.bomb_hits_required
+                    player.ground_pound_charge_hits = player.ground_pound_hits_required
+                    player.special_stun_duration = character_special_stun_duration[selected_character]
+                    player.special_hits_required = character_special_hits_required[selected_character]
+                    player.special_charge_hits = player.special_hits_required
                 elif character_select_back_rect.collidepoint(event.pos):
                     in_character_select = False
                     in_menu = True
@@ -263,8 +306,8 @@ def run_game() -> None:
 
         keys = pygame.key.get_pressed()
         update_player(player, player_state, keys, platforms, dt)
-        update_enemy(enemy, enemy_ai, player, platforms, dt)
-        resolve_combat(player, enemy, player_state)
+        update_enemy(enemy, enemy_ai, player, player_state, platforms, dt)
+        resolve_combat(player, enemy, enemy_ai, player_state)
 
         render_frame(screen, font, floating_text_font, platforms, player, enemy, player_state)
 

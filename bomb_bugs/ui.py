@@ -1,10 +1,8 @@
 import pygame
 
 from .config import (
-    BOMB_COOLDOWN,
     DASH_COOLDOWN,
     FLOOR_HEIGHT,
-    GROUND_POUND_COOLDOWN,
     HEALTH_BAR_HEIGHT,
     HEALTH_BAR_WIDTH,
     HEAL_COOLDOWN,
@@ -83,8 +81,12 @@ def draw_ability_boxes(
     surface: pygame.Surface,
     dash_cooldown_left: float,
     heal_cooldown_left: float,
-    bomb_cooldown_left: float,
-    ground_pound_cooldown_left: float,
+    bomb_charge_hits: float,
+    bomb_hits_required: float,
+    ground_pound_charge_hits: float,
+    ground_pound_hits_required: float,
+    special_charge_hits: float = 0.0,
+    special_hits_required: float = 0.0,
 ) -> None:
     box_size = 52
     padding = 12
@@ -93,8 +95,12 @@ def draw_ability_boxes(
 
     dash_ratio = 1.0 - max(0.0, min(1.0, dash_cooldown_left / DASH_COOLDOWN))
     heal_ratio = 1.0 - max(0.0, min(1.0, heal_cooldown_left / HEAL_COOLDOWN))
-    bomb_ratio = 1.0 - max(0.0, min(1.0, bomb_cooldown_left / BOMB_COOLDOWN))
-    pound_ratio = 1.0 - max(0.0, min(1.0, ground_pound_cooldown_left / GROUND_POUND_COOLDOWN))
+    bomb_ratio = 1.0 if bomb_hits_required <= 0.0 else max(0.0, min(1.0, bomb_charge_hits / bomb_hits_required))
+    pound_ratio = (
+        1.0
+        if ground_pound_hits_required <= 0.0
+        else max(0.0, min(1.0, ground_pound_charge_hits / ground_pound_hits_required))
+    )
 
     dash_rect = pygame.Rect(base_x, base_y, box_size, box_size)
     bomb_rect = pygame.Rect(base_x + box_size + padding, base_y, box_size, box_size)
@@ -110,6 +116,12 @@ def draw_ability_boxes(
     _draw_icon_with_recharge(surface, bomb_rect, bomb_ratio, _draw_bomb_icon)
     _draw_icon_with_recharge(surface, heal_rect, heal_ratio, _draw_potion_icon)
     _draw_icon_with_recharge(surface, pound_rect, pound_ratio, _draw_ground_pound_icon)
+
+    if special_hits_required > 0.0:
+        special_ratio = max(0.0, min(1.0, special_charge_hits / special_hits_required))
+        special_rect = pygame.Rect(base_x + (box_size + padding) * 4, base_y, box_size, box_size)
+        _draw_box(surface, special_rect)
+        _draw_icon_with_recharge(surface, special_rect, special_ratio, _draw_web_icon)
 
 
 def _draw_box(surface: pygame.Surface, rect: pygame.Rect) -> None:
@@ -246,5 +258,26 @@ def _draw_ground_pound_icon(target: pygame.Surface, colored: bool) -> None:
         "2": (180, 82, 55, 255) if colored else (120, 120, 120, 255),
         "3": (142, 88, 54, 255) if colored else (115, 115, 115, 255),
         "4": (206, 168, 122, 255) if colored else (135, 135, 135, 255),
+    }
+    _draw_pixel_pattern(target, pattern, palette)
+
+
+def _draw_web_icon(target: pygame.Surface, colored: bool) -> None:
+    pattern = [
+        "...1111...",
+        "..1..2..1.",
+        ".1.2.2.2.1",
+        "1..2.3.2..1",
+        "12223332221",
+        "1..2.3.2..1",
+        ".1.2.2.2.1",
+        "..1..2..1.",
+        "...1111...",
+        "..........",
+    ]
+    palette = {
+        "1": (245, 245, 245, 255) if colored else (145, 145, 145, 255),
+        "2": (223, 223, 223, 255) if colored else (130, 130, 130, 255),
+        "3": (255, 255, 255, 255) if colored else (160, 160, 160, 255),
     }
     _draw_pixel_pattern(target, pattern, palette)

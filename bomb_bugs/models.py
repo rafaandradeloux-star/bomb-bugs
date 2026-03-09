@@ -2,7 +2,16 @@ from dataclasses import dataclass, field
 
 import pygame
 
-from .config import BOMB_DAMAGE, DASH_DURATION, ENEMY_HIT_FLASH_DURATION, GROUND_POUND_DAMAGE, MAX_HP, SPEED
+from .config import (
+    BOMB_COOLDOWN,
+    BOMB_DAMAGE,
+    DASH_DURATION,
+    ENEMY_HIT_FLASH_DURATION,
+    GROUND_POUND_COOLDOWN,
+    GROUND_POUND_DAMAGE,
+    MAX_HP,
+    SPEED,
+)
 
 
 @dataclass
@@ -49,6 +58,15 @@ class Bomb:
     radius: int
     trail_timer: float = 0.0
     homing: bool = True
+
+
+@dataclass
+class WebProjectile:
+    x: float
+    y: float
+    life: float
+    radius: int
+    speed: float
 
 
 @dataclass
@@ -110,11 +128,15 @@ class Actor:
     slash_damage: int = 1
     bomb_damage: int = BOMB_DAMAGE
     ground_pound_damage: int = GROUND_POUND_DAMAGE
+    bomb_hits_required: float = BOMB_COOLDOWN
+    bomb_charge_hits: float = BOMB_COOLDOWN
+    ground_pound_hits_required: float = GROUND_POUND_COOLDOWN
+    ground_pound_charge_hits: float = GROUND_POUND_COOLDOWN
     move_speed: float = SPEED
     dash_duration: float = DASH_DURATION
     special_stun_duration: float = 0.0
-    special_cooldown: float = 0.0
-    special_cooldown_left: float = 0.0
+    special_hits_required: float = 0.0
+    special_charge_hits: float = 0.0
     hit_flash_time: float = 0.0
     hit_flash_duration: float = ENEMY_HIT_FLASH_DURATION
     facing_dir: int = 1
@@ -138,6 +160,7 @@ class PlayerState:
     bomb_trail: list[DustParticle] = field(default_factory=list)
     heal_splashes: list[HealSplash] = field(default_factory=list)
     bombs: list[Bomb] = field(default_factory=list)
+    web_projectiles: list[WebProjectile] = field(default_factory=list)
     floating_texts: list[FloatingText] = field(default_factory=list)
     mushroom_clouds: list[MushroomCloud] = field(default_factory=list)
     ground_spikes: list[GroundSpike] = field(default_factory=list)
@@ -159,5 +182,7 @@ class EnemyAI:
     knockback_velocity_x: float = 0.0
     speed_scale: float = 1.0
     stun_time_left: float = 0.0
+    poison_ticks_left: int = 0
+    poison_tick_timer: float = 0.0
     path_sample_timer: float = 0.0
     path_points: list[tuple[float, float]] = field(default_factory=list)

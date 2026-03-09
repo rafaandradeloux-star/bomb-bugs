@@ -1,7 +1,15 @@
 import pygame
 import math
 
-from .config import BACKGROUND, BOMB_RADIUS, PLATFORM_COLOR, SCREEN_SHAKE_DURATION, SCREEN_SHAKE_INTENSITY, SQUARE_COLOR
+from .config import (
+    BACKGROUND,
+    BOMB_RADIUS,
+    PLATFORM_COLOR,
+    RESPAWN_ANIM_TIME,
+    SCREEN_SHAKE_DURATION,
+    SCREEN_SHAKE_INTENSITY,
+    SQUARE_COLOR,
+)
 from .effects import (
     draw_crescent_slash,
     draw_dash_trail,
@@ -44,25 +52,42 @@ def render_frame(
         scene,
         player_state.dash_cooldown_left,
         player_state.heal_cooldown_left,
-        player_state.bomb_cooldown_left,
-        player_state.ground_pound_cooldown_left,
+        player.bomb_charge_hits,
+        player.bomb_hits_required,
+        player.ground_pound_charge_hits,
+        player.ground_pound_hits_required,
+        player.special_charge_hits,
+        player.special_hits_required,
     )
 
     for bomb in player_state.bombs:
         radius = int(bomb.radius)
         pygame.draw.circle(scene, (28, 28, 28), (int(bomb.x), int(bomb.y)), radius)
         pygame.draw.circle(scene, (250, 160, 40), (int(bomb.x - radius * 0.2), int(bomb.y - radius * 0.6)), 2)
+    for web in player_state.web_projectiles:
+        cx, cy = int(web.x), int(web.y)
+        radius = int(web.radius)
+        pygame.draw.circle(scene, (245, 245, 245), (cx, cy), radius, 2)
+        pygame.draw.line(scene, (245, 245, 245), (cx - radius, cy), (cx + radius, cy), 1)
+        pygame.draw.line(scene, (245, 245, 245), (cx, cy - radius), (cx, cy + radius), 1)
+        d = max(2, int(radius * 0.72))
+        pygame.draw.line(scene, (245, 245, 245), (cx - d, cy - d), (cx + d, cy + d), 1)
+        pygame.draw.line(scene, (245, 245, 245), (cx - d, cy + d), (cx + d, cy - d), 1)
 
-    if player.alive:
+    player_walking_in = _is_respawn_walking(player)
+    if player.alive or player_walking_in:
         player_draw_color = _flash_tinted_color(player.color, player.hit_flash_time, player.hit_flash_duration)
         pygame.draw.rect(scene, player_draw_color, player.rect)
-        draw_health_bar(scene, player.rect, player.hp, player.max_hp)
-        if player_state.ground_pound_active:
+        if player.alive:
+            draw_health_bar(scene, player.rect, player.hp, player.max_hp)
+        if player.alive and player_state.ground_pound_active:
             draw_ground_pound_dive(scene, player.rect, player_state.velocity_y)
-    if enemy.alive:
+    enemy_walking_in = _is_respawn_walking(enemy)
+    if enemy.alive or enemy_walking_in:
         enemy_draw_color = _flash_tinted_color(enemy.color, enemy.hit_flash_time, enemy.hit_flash_duration)
         pygame.draw.rect(scene, enemy_draw_color, enemy.rect)
-        draw_health_bar(scene, enemy.rect, enemy.hp, enemy.max_hp)
+        if enemy.alive:
+            draw_health_bar(scene, enemy.rect, enemy.hp, enemy.max_hp)
 
     draw_dust_particles(scene, player.death_particles, (170, 150, 130))
     draw_dust_particles(scene, enemy.death_particles, (170, 150, 130))
@@ -103,6 +128,10 @@ def _flash_tinted_color(base: tuple[int, int, int], time_left: float, duration: 
         int(base[1] * (1.0 - t) + flash[1] * t),
         int(base[2] * (1.0 - t) + flash[2] * t),
     )
+
+
+def _is_respawn_walking(actor: Actor) -> bool:
+    return not actor.alive and 0.0 < actor.respawn_timer <= RESPAWN_ANIM_TIME
 
 
 def draw_pause_overlay(
