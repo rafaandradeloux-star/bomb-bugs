@@ -11,7 +11,7 @@ from .gameplay import (
     update_player,
 )
 from .models import Actor, EnemyAI, PlayerState
-from .rendering import draw_main_menu, draw_pause_overlay, render_frame
+from .rendering import draw_character_select, draw_main_menu, draw_pause_overlay, render_frame
 from .ui import create_pixel_font
 from .world import make_platforms
 
@@ -81,19 +81,64 @@ def run_game() -> None:
     )
 
     player_state, enemy_ai = _reset_combat_state(player, enemy, player_spawn, enemy_spawn)
+    selected_character = "mantis"
+    character_colors = {
+        "mantis": SQUARE_COLOR,
+        "rhino_beetle": (34, 60, 126),
+    }
+    character_slash_damage = {
+        "mantis": 2,
+        "rhino_beetle": 1,
+    }
+    character_move_speed = {
+        "mantis": 420.0,
+        "rhino_beetle": 300.0,
+    }
+    character_dash_duration = {
+        "mantis": 0.22,
+        "rhino_beetle": 0.14,
+    }
+    character_bomb_damage = {
+        "mantis": 3,
+        "rhino_beetle": 5,
+    }
+    character_ground_pound_damage = {
+        "mantis": 3,
+        "rhino_beetle": 5,
+    }
+    player.color = character_colors[selected_character]
+    player.slash_damage = character_slash_damage[selected_character]
+    player.move_speed = character_move_speed[selected_character]
+    player.dash_duration = character_dash_duration[selected_character]
+    player.bomb_damage = character_bomb_damage[selected_character]
+    player.ground_pound_damage = character_ground_pound_damage[selected_character]
 
     running = True
     paused = False
     in_menu = True
+    in_character_select = False
     while running:
         dt = clock.tick(60) / 1000.0
         mouse_pos = pygame.mouse.get_pos()
 
         play_button_rect = pygame.Rect(0, 0, 0, 0)
+        character_select_button_rect = pygame.Rect(0, 0, 0, 0)
+        character_select_back_rect = pygame.Rect(0, 0, 0, 0)
+        mantis_card_rect = pygame.Rect(0, 0, 0, 0)
+        rhino_card_rect = pygame.Rect(0, 0, 0, 0)
         leave_button_rect = pygame.Rect(0, 0, 0, 0)
         if in_menu:
             probe_label = menu_option_font.render("Play", False, (255, 255, 255))
             play_button_rect = probe_label.get_rect(center=(WIDTH // 2, 300)).inflate(44, 26)
+            character_select_probe_label = menu_option_font.render("Character select", False, (255, 255, 255))
+            character_select_button_rect = character_select_probe_label.get_rect(center=(WIDTH // 2, 360)).inflate(44, 26)
+        if in_character_select:
+            back_probe_label = menu_option_font.render("Back", False, (255, 255, 255))
+            character_select_back_rect = back_probe_label.get_rect(center=(WIDTH // 2, 470)).inflate(44, 26)
+            mantis_card_rect = pygame.Rect(0, 0, 280, 280)
+            mantis_card_rect.center = (WIDTH // 2 - 160, 265)
+            rhino_card_rect = pygame.Rect(0, 0, 280, 280)
+            rhino_card_rect.center = (WIDTH // 2 + 160, 265)
         if paused and not in_menu:
             leave_probe_label = menu_option_font.render("Leave", False, (255, 255, 255))
             leave_button_rect = leave_probe_label.get_rect(center=(WIDTH // 2, 210)).inflate(44, 26)
@@ -103,24 +148,62 @@ def run_game() -> None:
                 running = False
             elif in_menu and event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 in_menu = False
+                in_character_select = False
                 paused = False
                 player_state, enemy_ai = _reset_combat_state(player, enemy, player_spawn, enemy_spawn)
             elif in_menu and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if play_button_rect.collidepoint(event.pos):
                     in_menu = False
+                    in_character_select = False
                     paused = False
                     player_state, enemy_ai = _reset_combat_state(player, enemy, player_spawn, enemy_spawn)
+                elif character_select_button_rect.collidepoint(event.pos):
+                    in_menu = False
+                    in_character_select = True
+                    paused = False
+            elif in_character_select and event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                in_character_select = False
+                in_menu = True
+                paused = False
+            elif in_character_select and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if mantis_card_rect.collidepoint(event.pos):
+                    selected_character = "mantis"
+                    player.color = character_colors[selected_character]
+                    player.slash_damage = character_slash_damage[selected_character]
+                    player.move_speed = character_move_speed[selected_character]
+                    player.dash_duration = character_dash_duration[selected_character]
+                    player.bomb_damage = character_bomb_damage[selected_character]
+                    player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                elif rhino_card_rect.collidepoint(event.pos):
+                    selected_character = "rhino_beetle"
+                    player.color = character_colors[selected_character]
+                    player.slash_damage = character_slash_damage[selected_character]
+                    player.move_speed = character_move_speed[selected_character]
+                    player.dash_duration = character_dash_duration[selected_character]
+                    player.bomb_damage = character_bomb_damage[selected_character]
+                    player.ground_pound_damage = character_ground_pound_damage[selected_character]
+                elif character_select_back_rect.collidepoint(event.pos):
+                    in_character_select = False
+                    in_menu = True
+                    paused = False
             elif not in_menu and paused and event.type == pygame.KEYDOWN and event.key == pygame.K_l:
                 in_menu = True
+                in_character_select = False
                 paused = False
             elif not in_menu and paused and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if leave_button_rect.collidepoint(event.pos):
                     in_menu = True
+                    in_character_select = False
                     paused = False
-            elif not in_menu and event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+            elif (
+                not in_menu
+                and not in_character_select
+                and event.type == pygame.KEYDOWN
+                and event.key == pygame.K_ESCAPE
+            ):
                 paused = not paused
             else:
-                if not in_menu and not paused:
+                if not in_menu and not in_character_select and not paused:
                     handle_input_event(event, player, enemy, player_state, platforms)
 
         if in_menu:
@@ -129,6 +212,19 @@ def run_game() -> None:
                 menu_title_font,
                 menu_option_font,
                 play_button_rect.collidepoint(mouse_pos),
+                character_select_button_rect.collidepoint(mouse_pos),
+            )
+            continue
+
+        if in_character_select:
+            draw_character_select(
+                screen,
+                pause_font,
+                menu_option_font,
+                selected_character,
+                mantis_card_rect.collidepoint(mouse_pos),
+                rhino_card_rect.collidepoint(mouse_pos),
+                character_select_back_rect.collidepoint(mouse_pos),
             )
             continue
 

@@ -1,7 +1,7 @@
 import pygame
 import math
 
-from .config import BACKGROUND, BOMB_RADIUS, PLATFORM_COLOR, SCREEN_SHAKE_DURATION, SCREEN_SHAKE_INTENSITY
+from .config import BACKGROUND, BOMB_RADIUS, PLATFORM_COLOR, SCREEN_SHAKE_DURATION, SCREEN_SHAKE_INTENSITY, SQUARE_COLOR
 from .effects import (
     draw_crescent_slash,
     draw_dash_trail,
@@ -130,7 +130,8 @@ def draw_main_menu(
     title_font: pygame.font.Font,
     option_font: pygame.font.Font,
     play_hovered: bool,
-) -> pygame.Rect:
+    character_select_hovered: bool,
+) -> None:
     screen.fill(BACKGROUND)
 
     title = title_font.render("BOMB BUGS", False, (255, 255, 255))
@@ -152,5 +153,107 @@ def draw_main_menu(
         screen.blit(play_outline, (play_rect.x + ox, play_rect.y + oy))
     screen.blit(play_label, play_rect)
 
+    select_label = option_font.render(
+        "Character select",
+        False,
+        (255, 255, 255) if character_select_hovered else (230, 230, 230),
+    )
+    select_outline = option_font.render("Character select", False, (24, 24, 24))
+    select_rect = select_label.get_rect(center=(screen.get_width() // 2, 360))
+    select_box = select_rect.inflate(44, 26)
+    select_fill = (124, 86, 58) if character_select_hovered else (98, 67, 46)
+    pygame.draw.rect(screen, select_fill, select_box)
+    pygame.draw.rect(screen, (34, 24, 17), select_box, 4)
+    for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        screen.blit(select_outline, (select_rect.x + ox, select_rect.y + oy))
+    screen.blit(select_label, select_rect)
+
     pygame.display.flip()
-    return box
+
+
+def draw_character_select(
+    screen: pygame.Surface,
+    title_font: pygame.font.Font,
+    option_font: pygame.font.Font,
+    selected_character: str,
+    mantis_hovered: bool,
+    rhino_hovered: bool,
+    back_hovered: bool,
+) -> None:
+    screen.fill(BACKGROUND)
+
+    title = title_font.render("Character Select", False, (255, 255, 255))
+    title_outline = title_font.render("Character Select", False, (38, 38, 38))
+    title_x = (screen.get_width() - title.get_width()) // 2
+    title_y = 80
+    for ox, oy in ((-3, 0), (3, 0), (0, -3), (0, 3), (-3, -3), (3, 3), (-3, 3), (3, -3)):
+        screen.blit(title_outline, (title_x + ox, title_y + oy))
+    screen.blit(title, (title_x, title_y))
+
+    mantis_card = pygame.Rect(0, 0, 280, 280)
+    mantis_card.center = (screen.get_width() // 2 - 160, 265)
+    rhino_card = pygame.Rect(0, 0, 280, 280)
+    rhino_card.center = (screen.get_width() // 2 + 160, 265)
+
+    _draw_character_card(
+        screen,
+        option_font,
+        mantis_card,
+        SQUARE_COLOR,
+        "mantis",
+        selected_character == "mantis",
+        mantis_hovered,
+    )
+    _draw_character_card(
+        screen,
+        option_font,
+        rhino_card,
+        (34, 60, 126),
+        "rhino beetle",
+        selected_character == "rhino_beetle",
+        rhino_hovered,
+    )
+
+    back_label = option_font.render("Back", False, (255, 255, 255) if back_hovered else (230, 230, 230))
+    back_outline = option_font.render("Back", False, (24, 24, 24))
+    back_rect = back_label.get_rect(center=(screen.get_width() // 2, 470))
+    back_box = back_rect.inflate(44, 26)
+    back_fill = (124, 86, 58) if back_hovered else (98, 67, 46)
+    pygame.draw.rect(screen, back_fill, back_box)
+    pygame.draw.rect(screen, (34, 24, 17), back_box, 4)
+    for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        screen.blit(back_outline, (back_rect.x + ox, back_rect.y + oy))
+    screen.blit(back_label, back_rect)
+
+    pygame.display.flip()
+
+
+def _draw_character_card(
+    screen: pygame.Surface,
+    option_font: pygame.font.Font,
+    card: pygame.Rect,
+    square_color: tuple[int, int, int],
+    label_text: str,
+    selected: bool,
+    hovered: bool,
+) -> None:
+    card_fill = (111, 78, 54) if hovered else (98, 67, 46)
+    pygame.draw.rect(screen, card_fill, card)
+    border_color = (255, 224, 130) if selected else (34, 24, 17)
+    border_width = 5 if selected else 4
+    pygame.draw.rect(screen, border_color, card, border_width)
+
+    square_box = pygame.Rect(0, 0, 128, 128)
+    square_box.center = (card.centerx, card.top + 105)
+    pygame.draw.rect(screen, (122, 94, 70), square_box)
+    pygame.draw.rect(screen, (34, 24, 17), square_box, 3)
+    sprite = pygame.Rect(0, 0, 74, 74)
+    sprite.center = square_box.center
+    pygame.draw.rect(screen, square_color, sprite)
+
+    label = option_font.render(label_text, False, (245, 245, 245))
+    label_rect = label.get_rect(center=(card.centerx, card.top + 212))
+    outline = option_font.render(label_text, False, (24, 24, 24))
+    for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+        screen.blit(outline, (label_rect.x + ox, label_rect.y + oy))
+    screen.blit(label, label_rect)

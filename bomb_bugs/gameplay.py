@@ -6,7 +6,6 @@ import pygame
 from .combat import build_slash_rect
 from .config import (
     BOMB_COOLDOWN,
-    BOMB_DAMAGE,
     BOMB_GRAVITY,
     BOMB_HITBOX_RADIUS,
     BOMB_HOMING_SPEED,
@@ -16,7 +15,6 @@ from .config import (
     BOMB_SPEED_Y,
     BOMB_TRAIL_SPAWN_INTERVAL,
     DASH_COOLDOWN,
-    DASH_DURATION,
     DASH_SPEED,
     ENEMY_CHASE_SPEED,
     ENEMY_JUMP_COOLDOWN,
@@ -29,7 +27,6 @@ from .config import (
     FLOATING_TEXT_RISE_SPEED,
     GRAVITY,
     GROUND_POUND_COOLDOWN,
-    GROUND_POUND_DAMAGE,
     GROUND_POUND_FALL_SPEED,
     HEAL_AMOUNT,
     HEAL_COOLDOWN,
@@ -41,7 +38,6 @@ from .config import (
     SCREEN_SHAKE_DURATION,
     SLASH_ACTIVE_TIME,
     SLASH_RANGE_X,
-    SPEED,
     TRAIL_SPAWN_INTERVAL,
     WIDTH,
 )
@@ -208,7 +204,7 @@ def handle_input_event(
                 input_dir += 1
             player_state.dash_dir = input_dir if input_dir != 0 else player.facing_dir
             if player_state.dash_dir != 0:
-                player_state.dash_time_left = DASH_DURATION
+                player_state.dash_time_left = player.dash_duration
                 player_state.dash_cooldown_left = DASH_COOLDOWN
                 player_state.trail_spawn_timer = 0.0
         return
@@ -221,7 +217,7 @@ def handle_input_event(
 
             if enemy.alive and player_slash_rect.colliderect(enemy.rect):
                 old_hp = enemy.hp
-                enemy.hp = max(0, enemy.hp - 1)
+                enemy.hp = max(0, enemy.hp - player.slash_damage)
                 _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
                 if enemy.hp == 0:
                     enemy.alive = False
@@ -265,7 +261,7 @@ def update_player(
             player_state.dash_trail.append(make_trail_particle(float(player.rect.x), float(player.rect.y)))
             player_state.trail_spawn_timer = TRAIL_SPAWN_INTERVAL
     else:
-        player.rect.x += int(direction * SPEED * dt)
+        player.rect.x += int(direction * player.move_speed * dt)
     player.rect.x = max(0, min(player.rect.x, WIDTH - player.rect.width))
 
     previous_bottom = player.rect.bottom
@@ -340,7 +336,7 @@ def resolve_combat(player: Actor, enemy: Actor, player_state: PlayerState) -> No
 
     if player_state.ground_pound_active and player.rect.colliderect(enemy.rect):
         old_hp = enemy.hp
-        enemy.hp = max(0, enemy.hp - GROUND_POUND_DAMAGE)
+        enemy.hp = max(0, enemy.hp - player.ground_pound_damage)
         _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)
         player_state.shake_time_left = SCREEN_SHAKE_DURATION
         player_state.ground_pound_active = False
@@ -450,7 +446,7 @@ def _update_bombs(player: Actor, enemy: Actor, player_state: PlayerState, dt: fl
             bomb_rect = pygame.Rect(int(bomb.x - radius), int(bomb.y - radius), radius * 2, radius * 2)
             if bomb_rect.colliderect(enemy.rect):
                 old_hp = enemy.hp
-                enemy.hp = max(0, enemy.hp - BOMB_DAMAGE)
+                enemy.hp = max(0, enemy.hp - player.bomb_damage)
                 player_state.mushroom_clouds.append(make_mushroom_cloud(float(enemy.rect.centerx), float(enemy.rect.bottom)))
                 player_state.shake_time_left = SCREEN_SHAKE_DURATION
                 _spawn_floating_text(player_state, enemy.rect, old_hp - enemy.hp, is_heal=False)

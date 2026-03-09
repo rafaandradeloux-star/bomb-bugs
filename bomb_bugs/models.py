@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 import pygame
 
-from .config import MAX_HP
+from .config import BOMB_DAMAGE, DASH_DURATION, GROUND_POUND_DAMAGE, MAX_HP, SPEED
 
 
 @dataclass
@@ -107,6 +107,11 @@ class Actor:
     respawn_timer: float = 0.0
     slash_time_left: float = 0.0
     slash_cooldown_left: float = 0.0
+    slash_damage: int = 1
+    bomb_damage: int = BOMB_DAMAGE
+    ground_pound_damage: int = GROUND_POUND_DAMAGE
+    move_speed: float = SPEED
+    dash_duration: float = DASH_DURATION
     facing_dir: int = 1
     death_particles: list[DustParticle] = field(default_factory=list)
     respawn_particles: list[RespawnParticle] = field(default_factory=list)
