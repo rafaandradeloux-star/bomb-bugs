@@ -180,8 +180,10 @@ Controls:
 - Jump: `Space`, `W`, or `Up Arrow`
 - Dash: `Left Shift` or `Right Shift`
 - Slash attack: `Left Mouse Click`
-- Throw bomb (5 damage, 5s cooldown): `F`
-- Heal + green floor splash: `E`
+- Throw bomb (hit-charge ability): `F`
+- Ground pound (hit-charge ability): `Q` while airborne above enemy
+- Heal + green floor splash (5s cooldown): `E`
+- Character special (hit-charge ability): `Space`
 - Quit: close the game window
 
 ## Code Structure (Modularized)
@@ -190,8 +192,16 @@ The gameplay code was split into focused modules so it is easier to read and ext
 
 - `main.py`: thin entrypoint that starts the game.
 - `bomb_bugs/game.py`: orchestration loop (wires modules together).
-- `bomb_bugs/gameplay.py`: gameplay systems (input, combat, movement, bombs, respawn, floating text events).
+- `bomb_bugs/gameplay.py`: thin facade that re-exports gameplay systems.
+- `bomb_bugs/gameplay_common.py`: shared gameplay helpers (floating text, platform jump checks, hit-charge grants).
+- `bomb_bugs/gameplay_input.py`: input-driven abilities and attacks.
+- `bomb_bugs/gameplay_movement.py`: player and enemy movement/update systems.
+- `bomb_bugs/gameplay_combat.py`: close-range combat resolution.
+- `bomb_bugs/gameplay_respawn.py`: respawn walk-in animation/state resets.
+- `bomb_bugs/gameplay_effects.py`: timer ticks, projectile updates, and transient particle/effect state updates.
 - `bomb_bugs/rendering.py`: frame rendering pipeline.
+- `bomb_bugs/menu_background.py`: pixel-art menu world (clouds, trees, birds) and menu-scene animation state.
+- `bomb_bugs/character_profiles.py`: data-driven character definitions and one-call profile application.
 - `bomb_bugs/config.py`: constants and tuning values (movement, combat, timing).
 - `bomb_bugs/models.py`: shared data models (`Actor`, particles, state objects).
 - `bomb_bugs/world.py`: platform creation and landing/collision helpers.

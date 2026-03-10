@@ -5,6 +5,7 @@ import pygame
 from .config import (
     BOMB_COOLDOWN,
     BOMB_DAMAGE,
+    BOMB_HOMING_SPEED,
     DASH_DURATION,
     ENEMY_HIT_FLASH_DURATION,
     GROUND_POUND_COOLDOWN,
@@ -59,6 +60,8 @@ class Bomb:
     radius: int
     trail_timer: float = 0.0
     homing: bool = True
+    homing_speed: float = BOMB_HOMING_SPEED
+    owner_is_enemy: bool = False
 
 
 @dataclass
@@ -138,6 +141,8 @@ class Actor:
     dash_duration: float = DASH_DURATION
     special_stun_duration: float = 0.0
     special_invincible_duration: float = 0.0
+    special_counter_enabled: bool = False
+    special_counter_active: bool = False
     special_hits_required: float = 0.0
     special_charge_hits: float = 0.0
     invincible_time_left: float = 0.0
@@ -191,3 +196,4 @@ class EnemyAI:
     poison_tick_timer: float = 0.0
     path_sample_timer: float = 0.0
     path_points: list[tuple[float, float]] = field(default_factory=list)
+    bomb_cooldown_left: float = 0.0

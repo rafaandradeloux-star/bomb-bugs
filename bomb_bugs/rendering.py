@@ -23,6 +23,7 @@ from .effects import (
     draw_respawn_particles,
     draw_rubble_particles,
 )
+from .menu_background import draw_menu_pixel_background
 from .models import Actor, EnemyAI, PlayerState
 from .ui import draw_ability_boxes, draw_floating_texts, draw_health_bar
 
@@ -36,6 +37,12 @@ def render_frame(
     enemy: Actor,
     enemy_ai: EnemyAI,
     player_state: PlayerState,
+    left_score: int = 0,
+    right_score: int = 0,
+    score_target: int = 5,
+    left_pulse_time: float = 0.0,
+    right_pulse_time: float = 0.0,
+    pulse_duration: float = 0.55,
     present: bool = True,
 ) -> None:
     scene = pygame.Surface(screen.get_size())
@@ -53,6 +60,8 @@ def render_frame(
     special_icon = None
     if player.special_stun_duration > 0.0:
         special_icon = "web"
+    elif player.special_counter_enabled:
+        special_icon = "bomb_x"
     elif player.special_invincible_duration > 0.0:
         special_icon = "shield"
     draw_ability_boxes(
@@ -92,8 +101,7 @@ def render_frame(
             draw_ground_pound_dive(scene, player.rect, player_state.velocity_y)
     enemy_walking_in = _is_respawn_walking(enemy)
     if enemy.alive or enemy_walking_in:
-        enemy_draw_color = _flash_tinted_color(enemy.color, enemy.hit_flash_time, enemy.hit_flash_duration)
-        pygame.draw.rect(scene, enemy_draw_color, enemy.rect)
+        _draw_fire_ant(scene, enemy.rect, enemy.hit_flash_time, enemy.hit_flash_duration)
         wrap_alpha = 0
         if enemy_ai.stun_time_left > 0.0:
             wrap_alpha = 255
@@ -115,6 +123,16 @@ def render_frame(
         draw_crescent_slash(scene, enemy.rect, enemy.facing_dir, enemy.slash_time_left)
 
     draw_floating_texts(scene, floating_text_font, player_state.floating_texts)
+    _draw_match_counters(
+        scene,
+        font,
+        left_score,
+        right_score,
+        score_target,
+        left_pulse_time,
+        right_pulse_time,
+        pulse_duration,
+    )
 
     shake_x, shake_y = _screen_shake_offset(player_state.shake_time_left, player_state.shake_phase)
     screen.fill(BACKGROUND)
@@ -122,6 +140,63 @@ def render_frame(
 
     if present:
         pygame.display.flip()
+
+
+def _draw_match_counters(
+    surface: pygame.Surface,
+    font: pygame.font.Font,
+    left_score: int,
+    right_score: int,
+    score_target: int,
+    left_pulse_time: float,
+    right_pulse_time: float,
+    pulse_duration: float,
+) -> None:
+    def _draw_counter(
+        text: str,
+        base_pos: tuple[int, int],
+        flash_color: tuple[int, int, int],
+        pulse_time: float,
+        anchor_right: bool = False,
+    ) -> None:
+        pulse = 0.0 if pulse_duration <= 0.0 else max(0.0, min(1.0, pulse_time / pulse_duration))
+        progress = 1.0 - pulse
+        pop_time = 0.09
+        pop_extra = 0.62
+        if progress < pop_time:
+            scale_bonus = pop_extra * (progress / pop_time)
+        else:
+            settle = (progress - pop_time) / max(0.001, (1.0 - pop_time))
+            # Slow exponential-style settle to feel like a balloon deflating.
+            scale_bonus = pop_extra * math.exp(-2.05 * settle)
+        scale = 1.72 + scale_bonus
+        flash_wave = 0.5 + 0.5 * math.sin(progress * 34.0)
+        flash_mix = pulse * flash_wave
+        color = (
+            int(252 * (1.0 - flash_mix) + flash_color[0] * flash_mix),
+            int(252 * (1.0 - flash_mix) + flash_color[1] * flash_mix),
+            int(252 * (1.0 - flash_mix) + flash_color[2] * flash_mix),
+        )
+        glyph = font.render(text, False, color)
+        outline = font.render(text, False, (22, 22, 22))
+        if scale > 1.001:
+            scaled_w = max(1, int(glyph.get_width() * scale))
+            scaled_h = max(1, int(glyph.get_height() * scale))
+            glyph = pygame.transform.scale(glyph, (scaled_w, scaled_h))
+            outline = pygame.transform.scale(outline, (scaled_w, scaled_h))
+        if anchor_right:
+            draw_x = base_pos[0] - glyph.get_width()
+            draw_y = base_pos[1]
+        else:
+            draw_x, draw_y = base_pos
+        for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            surface.blit(outline, (draw_x + ox, draw_y + oy))
+        surface.blit(glyph, (draw_x, draw_y))
+
+    left_text = f"{left_score}/{score_target}"
+    right_text = f"{right_score}/{score_target}"
+    _draw_counter(left_text, (16, 10), (66, 232, 96), left_pulse_time, anchor_right=False)
+    _draw_counter(right_text, (surface.get_width() - 16, 10), (235, 64, 64), right_pulse_time, anchor_right=True)
 
 
 def _screen_shake_offset(time_left: float, phase: float) -> tuple[int, int]:
@@ -143,6 +218,68 @@ def _flash_tinted_color(base: tuple[int, int, int], time_left: float, duration: 
         int(base[1] * (1.0 - t) + flash[1] * t),
         int(base[2] * (1.0 - t) + flash[2] * t),
     )
+
+
+def _draw_fire_ant(surface: pygame.Surface, rect: pygame.Rect, hit_flash_time: float, hit_flash_duration: float) -> None:
+    t = 0.0
+    if hit_flash_duration > 0.0 and hit_flash_time > 0.0:
+        t = max(0.0, min(1.0, hit_flash_time / hit_flash_duration))
+
+    def _mix(color: tuple[int, int, int]) -> tuple[int, int, int]:
+        return (
+            int(color[0] * (1.0 - t) + 255 * t),
+            int(color[1] * (1.0 - t) + 255 * t),
+            int(color[2] * (1.0 - t) + 255 * t),
+        )
+
+    ant_w, ant_h = 20, 30
+    ant = pygame.Surface((ant_w, ant_h), pygame.SRCALPHA)
+
+    body_dark = _mix((98, 34, 26))
+    body_mid = _mix((140, 52, 37))
+    body_light = _mix((186, 86, 58))
+    leg_color = _mix((72, 24, 20))
+    eye_color = _mix((28, 14, 14))
+
+    # Upright body stack (head / thorax / abdomen).
+    pygame.draw.rect(ant, body_dark, pygame.Rect(7, 0, 6, 6))      # head
+    pygame.draw.rect(ant, body_light, pygame.Rect(8, 1, 4, 3))
+    pygame.draw.rect(ant, body_dark, pygame.Rect(5, 6, 10, 10))    # thorax
+    pygame.draw.rect(ant, body_mid, pygame.Rect(7, 8, 6, 6))
+    pygame.draw.rect(ant, body_dark, pygame.Rect(4, 16, 12, 8))    # abdomen
+    pygame.draw.rect(ant, body_mid, pygame.Rect(6, 18, 8, 4))
+
+    # Eyes + mandibles.
+    pygame.draw.rect(ant, eye_color, pygame.Rect(8, 2, 1, 1))
+    pygame.draw.rect(ant, eye_color, pygame.Rect(11, 2, 1, 1))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(6, 4, 1, 1))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(13, 4, 1, 1))
+
+    # Antennae.
+    pygame.draw.rect(ant, leg_color, pygame.Rect(7, 0, 1, 2))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(12, 0, 1, 2))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(6, 0, 1, 1))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(13, 0, 1, 1))
+
+    # Two feet / legs stance.
+    pygame.draw.rect(ant, leg_color, pygame.Rect(6, 22, 3, 7))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(11, 22, 3, 7))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(5, 28, 4, 2))     # left foot
+    pygame.draw.rect(ant, leg_color, pygame.Rect(11, 28, 4, 2))    # right foot
+
+    # Small side arms/claws so it still reads as ant-like.
+    pygame.draw.rect(ant, leg_color, pygame.Rect(3, 10, 2, 1))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(15, 10, 2, 1))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(2, 11, 1, 2))
+    pygame.draw.rect(ant, leg_color, pygame.Rect(17, 11, 1, 2))
+
+    # Render larger than the hitbox while keeping feet planted at the same ground level.
+    draw_w = int(rect.width * 1.35)
+    draw_h = int(rect.height * 1.55)
+    sprite = pygame.transform.scale(ant, (draw_w, draw_h))
+    draw_x = rect.centerx - draw_w // 2
+    draw_y = rect.bottom - draw_h
+    surface.blit(sprite, (draw_x, draw_y))
 
 
 def _is_respawn_walking(actor: Actor) -> bool:
@@ -215,11 +352,12 @@ def draw_main_menu(
     character_select_hovered: bool,
 ) -> None:
     screen.fill(BACKGROUND)
-
     title = title_font.render("BOMB BUGS", False, (255, 255, 255))
     title_outline = title_font.render("BOMB BUGS", False, (38, 38, 38))
     title_x = (screen.get_width() - title.get_width()) // 2
     title_y = 112
+    draw_menu_pixel_background(screen, pygame.Rect(title_x, title_y, title.get_width(), title.get_height()))
+
     for ox, oy in ((-3, 0), (3, 0), (0, -3), (0, 3), (-3, -3), (3, 3), (-3, 3), (3, -3)):
         screen.blit(title_outline, (title_x + ox, title_y + oy))
     screen.blit(title, (title_x, title_y))

@@ -127,7 +127,12 @@ def draw_ability_boxes(
         special_ratio = max(0.0, min(1.0, special_charge_hits / special_hits_required))
         special_rect = pygame.Rect(base_x + (box_size + padding) * 4, base_y, box_size, box_size)
         _draw_box(surface, special_rect)
-        icon_drawer = _draw_shield_icon if special_icon == "shield" else _draw_web_icon
+        if special_icon == "shield":
+            icon_drawer = _draw_shield_icon
+        elif special_icon == "bomb_x":
+            icon_drawer = _draw_bomb_with_x_icon
+        else:
+            icon_drawer = _draw_web_icon
         _draw_icon_with_recharge(surface, special_rect, special_ratio, icon_drawer)
         _draw_key_label(surface, special_rect, "SPACE")
 
@@ -327,3 +332,29 @@ def _draw_shield_icon(target: pygame.Surface, colored: bool) -> None:
         "3": (59, 92, 144, 255) if colored else (105, 105, 105, 255),
     }
     _draw_pixel_pattern(target, pattern, palette)
+
+
+def _draw_bomb_with_x_icon(target: pygame.Surface, colored: bool) -> None:
+    _draw_bomb_icon(target, colored=colored)
+    x_color = (226, 48, 48, 255) if colored else (132, 132, 132, 255)
+    shadow_color = (88, 20, 20, 255) if colored else (96, 96, 96, 255)
+    w = target.get_width()
+    h = target.get_height()
+    inset = max(2, w // 9)
+    stroke = max(3, w // 8)
+
+    def _stamp(cx: int, cy: int, color: tuple[int, int, int, int], size: int) -> None:
+        pygame.draw.rect(target, color, pygame.Rect(cx - size // 2, cy - size // 2, size, size))
+
+    # Blocky diagonal stamps create a bolder, pixelated X.
+    steps = max(8, w - inset * 2)
+    for i in range(steps + 1):
+        t = i / steps
+        x1 = int(inset + (w - 2 * inset) * t)
+        y1 = int(inset + (h - 2 * inset) * t)
+        x2 = int(w - inset - (w - 2 * inset) * t)
+        y2 = y1
+        _stamp(x1, y1, shadow_color, stroke + 2)
+        _stamp(x2, y2, shadow_color, stroke + 2)
+        _stamp(x1, y1, x_color, stroke)
+        _stamp(x2, y2, x_color, stroke)

@@ -34,6 +34,7 @@ def handle_respawns(
             player.slash_time_left = 0.0
             player.slash_cooldown_left = 0.0
             player.invincible_time_left = 0.0
+            player.special_counter_active = False
             player_state.dash_time_left = 0.0
             player_state.ground_pound_active = False
             player_state.bombs.clear()
@@ -72,3 +73,4 @@ def handle_respawns(
             enemy_ai.poison_tick_timer = 0.0
             enemy_ai.path_sample_timer = 0.0
             enemy_ai.path_points.clear()
+            enemy_ai.bomb_cooldown_left = 0.0
